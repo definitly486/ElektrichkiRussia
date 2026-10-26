@@ -11,7 +11,7 @@ import androidx.appcompat.app.AppCompatActivity
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** Список сохранённых станций. */
+/** Список сохранённых маршрутов. */
 class FavoritesActivity : AppCompatActivity() {
     private val prefs by lazy { getSharedPreferences("ui", MODE_PRIVATE) }
     private lateinit var list: LinearLayout
@@ -67,7 +67,7 @@ class FavoritesActivity : AppCompatActivity() {
         list.removeAllViews()
         val favorites = readFavorites()
         if (favorites.length() == 0) {
-            list.addView(Ui.text(this, "Здесь будут станции, добавленные в избранное с главного экрана.\n\nВыберите станцию отправления или назначения и нажмите значок закладки.", 18f, Ui.GRAY).apply {
+            list.addView(Ui.text(this, "Здесь будут маршруты, добавленные в избранное с главного экрана.\n\nВыберите станции «Откуда» и «Куда», затем нажмите значок закладки.", 18f, Ui.GRAY).apply {
                 gravity = Gravity.CENTER
                 setPadding(Ui.dp(context, 28), Ui.dp(context, 48), Ui.dp(context, 28), Ui.dp(context, 48))
             }, LinearLayout.LayoutParams(-1, -1))
@@ -75,29 +75,38 @@ class FavoritesActivity : AppCompatActivity() {
         }
         for (i in 0 until favorites.length()) {
             val item = favorites.optJSONObject(i) ?: continue
-            val code = item.optString("code")
-            val title = item.optString("title", "Станция")
+            val fromCode = item.optString("from_code")
+            val fromTitle = item.optString("from_title", "Откуда")
+            val toCode = item.optString("to_code")
+            val toTitle = item.optString("to_title", "Куда")
+            val routeKey = "$fromCode|$toCode"
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
                 setBackgroundColor(Ui.PANEL)
                 setPadding(Ui.dp(context, 16), Ui.dp(context, 12), Ui.dp(context, 8), Ui.dp(context, 12))
                 setOnClickListener {
-                    startActivity(Intent(this@FavoritesActivity, StationScheduleActivity::class.java)
-                        .putExtra(StationScheduleActivity.EXTRA_CODE, code)
-                        .putExtra(StationScheduleActivity.EXTRA_TITLE, title))
+                    startActivity(Intent(this@FavoritesActivity, MainActivity::class.java)
+                        .putExtra(MainActivity.EXTRA_FROM_CODE, fromCode)
+                        .putExtra(MainActivity.EXTRA_FROM_TITLE, fromTitle)
+                        .putExtra(MainActivity.EXTRA_TO_CODE, toCode)
+                        .putExtra(MainActivity.EXTRA_TO_TITLE, toTitle))
                 }
             }
-            row.addView(Ui.icon(this, R.drawable.ic_station, 24), LinearLayout.LayoutParams(Ui.dp(this, 24), Ui.dp(this, 24)).apply {
+            row.addView(Ui.icon(this, R.drawable.ic_nav_route, 24), LinearLayout.LayoutParams(Ui.dp(this, 24), Ui.dp(this, 24)).apply {
                 marginEnd = Ui.dp(this@FavoritesActivity, 16)
             })
-            row.addView(Ui.text(this, title, 19f, Ui.WHITE, true), LinearLayout.LayoutParams(0, -2, 1f))
+            row.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                addView(Ui.text(this@FavoritesActivity, fromTitle, 18f, Ui.WHITE, true))
+                addView(Ui.text(this@FavoritesActivity, "↓  $toTitle", 16f, Ui.GRAY_LIGHT))
+            }, LinearLayout.LayoutParams(0, -2, 1f))
             row.addView(ImageView(this).apply {
                 setImageResource(R.drawable.ic_close)
                 setColorFilter(Ui.GRAY)
                 setPadding(Ui.dp(context, 12), Ui.dp(context, 12), Ui.dp(context, 12), Ui.dp(context, 12))
-                contentDescription = "Удалить из избранного"
-                setOnClickListener { removeFavorite(code) }
+                contentDescription = "Удалить маршрут из избранного"
+                setOnClickListener { removeFavorite(routeKey) }
             }, LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48)))
             list.addView(row, LinearLayout.LayoutParams(-1, -2))
             list.addView(Ui.divider(this))
@@ -105,19 +114,20 @@ class FavoritesActivity : AppCompatActivity() {
     }
 
     private fun readFavorites(): JSONArray = try {
-        JSONArray(prefs.getString("favorite_stations", "[]").orEmpty())
+        JSONArray(prefs.getString("favorite_routes", "[]").orEmpty())
     } catch (_: Exception) {
         JSONArray()
     }
 
-    private fun removeFavorite(code: String) {
+    private fun removeFavorite(routeKey: String) {
         val old = readFavorites()
         val updated = JSONArray()
         for (i in 0 until old.length()) {
             val item: JSONObject = old.optJSONObject(i) ?: continue
-            if (item.optString("code") != code) updated.put(item)
+            val key = "${item.optString("from_code")}|${item.optString("to_code")}"
+            if (key != routeKey) updated.put(item)
         }
-        prefs.edit().putString("favorite_stations", updated.toString()).apply()
+        prefs.edit().putString("favorite_routes", updated.toString()).apply()
         renderFavorites()
     }
 }
