@@ -511,8 +511,11 @@ class MainActivity : AppCompatActivity() {
                 }
                 val past = isToday && depMs != null && depMs < now
                 var caption = ""
+                var captionUrgent = false
                 if (isToday && !nextMarked && depMs != null && depMs >= now) {
-                    caption = "через " + Ui.duration(depMs - now)
+                    val timeUntilDeparture = depMs - now
+                    caption = "через " + Ui.duration(timeUntilDeparture)
+                    captionUrgent = timeUntilDeparture <= 10 * 60 * 1000L
                     nextMarked = true
                 }
 
@@ -524,7 +527,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 content.addView(row(
                     caption, Ui.hhmm(departure), durationMs?.let { Ui.duration(it) }.orEmpty(),
-                    Ui.hhmm(arrival), title, price(item), past
+                    Ui.hhmm(arrival), title, price(item), past, captionUrgent
                 ))
                 content.addView(Ui.divider(this))
             }
@@ -563,7 +566,7 @@ class MainActivity : AppCompatActivity() {
         setPadding(Ui.dp(context, 16), Ui.dp(context, 14), Ui.dp(context, 16), Ui.dp(context, 14))
     }
 
-    private fun row(caption: String, dep: String, dur: String, arr: String, title: String, price: String, past: Boolean): View {
+    private fun row(caption: String, dep: String, dur: String, arr: String, title: String, price: String, past: Boolean, captionUrgent: Boolean): View {
         val timeColor = if (past) Ui.GRAY else Ui.WHITE
         val arrColor = if (past) Ui.GRAY_DIM else Ui.GRAY_LIGHT
         val titleColor = if (past) Ui.GRAY_DIM else Ui.GRAY_LIGHT
@@ -574,7 +577,9 @@ class MainActivity : AppCompatActivity() {
             setPadding(Ui.dp(context, 16), Ui.dp(context, 16), Ui.dp(context, 16), Ui.dp(context, 16))
         }
         if (caption.isNotBlank()) {
-            box.addView(Ui.text(this, caption, 14f, Ui.GRAY_LIGHT).apply { setPadding(0, 0, 0, Ui.dp(context, 6)) })
+            box.addView(Ui.text(this, caption, 14f, if (captionUrgent) 0xFFF44336.toInt() else Ui.GRAY_LIGHT).apply {
+                setPadding(0, 0, 0, Ui.dp(context, 6))
+            })
             nextView = box
         }
         val line = LinearLayout(this).apply {
