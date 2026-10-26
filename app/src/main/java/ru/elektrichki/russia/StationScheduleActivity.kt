@@ -82,6 +82,7 @@ class StationScheduleActivity : AppCompatActivity() {
         stationCode = code
         stationTitle = title
         stationTitleText.text = title
+        stationTitleText.setTextColor(Ui.WHITE)
         entries = emptyList()
         load()
     }
