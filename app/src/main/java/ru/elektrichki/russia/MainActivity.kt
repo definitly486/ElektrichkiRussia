@@ -38,8 +38,6 @@ class MainActivity : AppCompatActivity() {
     private var job: Job? = null
 
     // views
-    private lateinit var tabSuburban: TextView
-    private lateinit var tabTickets: TextView
     private lateinit var fromText: TextView
     private lateinit var toText: TextView
     private lateinit var ticketsExtra: LinearLayout
@@ -100,22 +98,6 @@ class MainActivity : AppCompatActivity() {
             setBackgroundColor(Ui.BG)
             fitsSystemWindows = true
         }
-
-        // Переключатель «Электрички | Ж/д билеты»
-        val toggleWrap = FrameLayout(this).apply {
-            setPadding(0, Ui.dp(context, 12), 0, Ui.dp(context, 12))
-        }
-        val toggle = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setBackgroundResource(R.drawable.bg_segment_container)
-            setPadding(Ui.dp(context, 4), Ui.dp(context, 4), Ui.dp(context, 4), Ui.dp(context, 4))
-        }
-        tabSuburban = segment("Электрички") { setTicketsTab(false) }
-        tabTickets = segment("Ж/д билеты") { setTicketsTab(true) }
-        toggle.addView(tabSuburban, LinearLayout.LayoutParams(Ui.dp(this, 116), Ui.dp(this, 40)))
-        toggle.addView(tabTickets, LinearLayout.LayoutParams(Ui.dp(this, 116), Ui.dp(this, 40)))
-        toggleWrap.addView(toggle, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_HORIZONTAL))
-        root.addView(toggleWrap)
 
         // Панель маршрута A → B
         val panel = LinearLayout(this).apply {
@@ -254,13 +236,6 @@ class MainActivity : AppCompatActivity() {
         setContentView(root)
     }
 
-    private fun segment(label: String, onClick: () -> Unit) = TextView(this).apply {
-        text = label
-        textSize = 20f
-        gravity = Gravity.CENTER
-        setOnClickListener { onClick() }
-    }
-
     private fun badge(letter: String, bg: Int) = TextView(this).apply {
         text = letter
         textSize = 20f
@@ -291,12 +266,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshTabs() {
-        val sel = { v: TextView, on: Boolean ->
-            v.setBackgroundResource(if (on) R.drawable.bg_segment_selected else 0)
-            v.setTextColor(if (on) Ui.WHITE else Ui.GRAY)
-        }
-        sel(tabSuburban, !ticketsTab)
-        sel(tabTickets, ticketsTab)
         ticketsExtra.visibility = if (ticketsTab) View.VISIBLE else View.GONE
         daysRow.visibility = if (ticketsTab) View.GONE else View.VISIBLE
         fab.visibility = if (ticketsTab) View.GONE else View.VISIBLE
