@@ -46,6 +46,8 @@ class MainActivity : AppCompatActivity() {
         fromField.isClickable = true
         toField.isFocusable = false
         toField.isClickable = true
+        fromField.setOnClickListener { chooseStation(true) }
+        toField.setOnClickListener { chooseStation(false) }
         root.addView(fromField)
         root.addView(button("Найти станцию отправления по названию") { chooseStation(true) })
         root.addView(toField)
@@ -63,11 +65,11 @@ class MainActivity : AppCompatActivity() {
         root.addView(space(10))
         output = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         root.addView(output)
-        showMessage(if (api.apiKey().isBlank()) "Добавьте API-ключ в настройках, чтобы получать реальные данные." else "Введите код станции и выберите действие.")
+        showMessage(if (api.apiKey().isBlank()) "Добавьте API-ключ в настройках, чтобы получать реальные данные." else "Найдите станцию по названию и выберите действие.")
     }
 
 private fun checkApiKey() {
-    if (BuildConfig.YANDEX_RASP_API_KEY.isBlank()) {
+    if (api.apiKey().isBlank()) {
         androidx.appcompat.app.AlertDialog.Builder(this)
             .setTitle("API-ключ не указан")
             .setMessage(
@@ -194,18 +196,21 @@ private fun checkApiKey() {
             for (i in 0 until arr.length()) {
                 val item = arr.optJSONObject(i) ?: continue
                 val thread = item.optJSONObject("thread") ?: JSONObject()
-                val departure = item.optString("departure", item.optString("start_date", ""))
-                val arrival = item.optString("arrival", "")
-                val title = thread.optString("title", item.optString("title", "Пригородный поезд"))
-                val number = thread.optString("number", "")
-                val platform = item.optString("platform", "")
-                val stops = item.optString("stops", "")
+                val departure = item.str("departure").ifBlank { item.str("start_date") }
+                val arrival = item.str("arrival")
+                val title = thread.str("title").ifBlank { item.str("title") }.ifBlank { "Пригородный поезд" }
+                val number = thread.str("number")
+                val platform = item.str("platform")
+                    .ifBlank { item.str("departure_platform") }
+                val arrivalPlatform = item.str("arrival_platform")
+                val stops = item.str("stops")
                 val line = buildString {
                     append(title)
                     if (number.isNotBlank()) append("\nПоезд: $number")
-                    if (departure.isNotBlank()) append("\nОтправление: ${departure.replace('T', ' ')}")
-                    if (arrival.isNotBlank()) append("\nПрибытие: ${arrival.replace('T', ' ')}")
-                    if (platform.isNotBlank()) append("\nПуть: $platform")
+                    if (departure.isNotBlank()) append("\nОтправление: ${fmtTime(departure)}")
+                    if (arrival.isNotBlank()) append("\nПрибытие: ${fmtTime(arrival)}")
+                    if (platform.isNotBlank()) append("\nПуть отправления: $platform")
+                    if (arrivalPlatform.isNotBlank()) append("\nПуть прибытия: $arrivalPlatform")
                     if (stops.isNotBlank()) append("\nОстановки: $stops")
                 }
                 val card = TextView(this).apply {
@@ -225,6 +230,13 @@ private fun checkApiKey() {
         }
     }
 
+    /** На Android optString для JSON null возвращает строку "null" — здесь пустая строка. */
+    private fun JSONObject.str(key: String): String =
+        if (isNull(key)) "" else optString(key, "").trim()
+
+    /** 2026-10-26T10:15:00+03:00 -> 2026-10-26 10:15 (время по станции) */
+    private fun fmtTime(s: String): String = s.replace('T', ' ').take(16)
+
     private fun showMessage(message: String) {
         output.removeAllViews()
         addOutputText(message, false)
@@ -232,6 +244,7 @@ private fun checkApiKey() {
     private fun addOutputText(s: String, bold: Boolean) { output.addView(text(s, 15f, 0xFF292629.toInt(), bold)) }
     private fun edit(hintText: String) = EditText(this).apply {
         hint = hintText; textSize = 15f; setSingleLine(true)
+        setTextColor(0xFF201E21.toInt()); setHintTextColor(0xFF8A858A.toInt())
         setPadding(12, 8, 12, 8)
         val lp = LinearLayout.LayoutParams(-1, -2); lp.setMargins(0, 4, 0, 4)
         layoutParams = lp
