@@ -1,6 +1,5 @@
 package ru.elektrichki.russia
 
-import android.app.DatePickerDialog
 import android.content.Intent
 import android.os.Bundle
 import android.view.Gravity
@@ -65,6 +64,16 @@ class MainActivity : AppCompatActivity() {
         }
         saveStations()
         refreshFields()
+        if (!ticketsTab) search()
+    }
+
+    private val pickDateLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        if (r.resultCode != RESULT_OK) return@registerForActivityResult
+        val date = r.data?.getStringExtra(DatePickActivity.EXTRA_DATE).orEmpty()
+        if (date.isBlank()) return@registerForActivityResult
+        customDate = date
+        dayMode = DAY_CUSTOM
+        refreshDays()
         if (!ticketsTab) search()
     }
 
@@ -186,7 +195,10 @@ class MainActivity : AppCompatActivity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(Ui.dp(context, 16), 0, Ui.dp(context, 16), 0)
         }
-        daysRow.addView(Ui.icon(this, R.drawable.ic_calendar, 32).apply { setPadding(Ui.dp(context, 2), Ui.dp(context, 2), Ui.dp(context, 2), Ui.dp(context, 2)) })
+        daysRow.addView(Ui.icon(this, R.drawable.ic_calendar, 32).apply {
+            setPadding(Ui.dp(context, 2), Ui.dp(context, 2), Ui.dp(context, 2), Ui.dp(context, 2))
+            setOnClickListener { pickDate() }
+        })
         dayToday = dayTab("Сегодня") { dayMode = DAY_TODAY; refreshDays(); search() }
         dayTomorrow = dayTab("Завтра") { dayMode = DAY_TOMORROW; refreshDays(); search() }
         dayAll = dayTab("Все дни") { pickDate() }
@@ -340,13 +352,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun pickDate() {
-        val c = Calendar.getInstance()
-        DatePickerDialog(this, { _, y, m, d ->
-            customDate = String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d)
-            dayMode = DAY_CUSTOM
-            refreshDays()
-            if (!ticketsTab) search()
-        }, c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show()
+        pickDateLauncher.launch(Intent(this, DatePickActivity::class.java)
+            .putExtra(DatePickActivity.EXTRA_SELECTED, currentDate()))
     }
 
     private fun notImplemented() {
