@@ -78,10 +78,11 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         api = YandexRaspApi(this)
-        fromCode = prefs.getString("from_code", "").orEmpty()
-        fromTitle = prefs.getString("from_title", "").orEmpty()
-        toCode = prefs.getString("to_code", "").orEmpty()
-        toTitle = prefs.getString("to_title", "").orEmpty()
+        fromCode = intent.getStringExtra(EXTRA_FROM_CODE) ?: prefs.getString("from_code", "").orEmpty()
+        fromTitle = intent.getStringExtra(EXTRA_FROM_TITLE) ?: prefs.getString("from_title", "").orEmpty()
+        toCode = intent.getStringExtra(EXTRA_TO_CODE) ?: prefs.getString("to_code", "").orEmpty()
+        toTitle = intent.getStringExtra(EXTRA_TO_TITLE) ?: prefs.getString("to_title", "").orEmpty()
+        if (intent.hasExtra(EXTRA_FROM_CODE)) saveStations()
         buildUi()
         refreshFields()
         refreshTabs()
@@ -334,25 +335,31 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun addCurrentStationsToFavorites() {
-        val candidates = listOf(fromCode to fromTitle, toCode to toTitle)
-            .filter { it.first.isNotBlank() && it.second.isNotBlank() }
-        if (candidates.isEmpty()) {
-            Toast.makeText(this, "Сначала выберите станцию", Toast.LENGTH_SHORT).show()
+        if (fromCode.isBlank() || fromTitle.isBlank() || toCode.isBlank() || toTitle.isBlank()) {
+            Toast.makeText(this, "Выберите станции отправления и назначения", Toast.LENGTH_SHORT).show()
             return
         }
-        val favorites = org.json.JSONArray(prefs.getString("favorite_stations", "[]").orEmpty())
-        val existing = (0 until favorites.length()).mapNotNull { favorites.optJSONObject(it) }
-            .map { it.optString("code") }.toMutableSet()
-        var added = 0
-        candidates.forEach { (code, title) ->
-            if (existing.add(code)) {
-                favorites.put(JSONObject().put("code", code).put("title", title))
-                added++
-            }
+        if (sameDepartureAndArrival()) {
+            Toast.makeText(this, "Нельзя добавить маршрут с одинаковыми станциями", Toast.LENGTH_SHORT).show()
+            return
         }
-        prefs.edit().putString("favorite_stations", favorites.toString()).apply()
-        val message = if (added > 0) "Станция добавлена в избранное" else "Станция уже в избранном"
-        Toast.makeText(this, if (candidates.size > 1 && added > 0) "Станции добавлены в избранное" else message, Toast.LENGTH_SHORT).show()
+
+        val favorites = org.json.JSONArray(prefs.getString("favorite_routes", "[]").orEmpty())
+        val routeKey = "$fromCode|$toCode"
+        val exists = (0 until favorites.length()).mapNotNull { favorites.optJSONObject(it) }
+            .any { "${it.optString("from_code")}|${it.optString("to_code")}" == routeKey }
+        if (exists) {
+            Toast.makeText(this, "Маршрут уже в избранном", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        favorites.put(JSONObject()
+            .put("from_code", fromCode)
+            .put("from_title", fromTitle)
+            .put("to_code", toCode)
+            .put("to_title", toTitle))
+        prefs.edit().putString("favorite_routes", favorites.toString()).apply()
+        Toast.makeText(this, "Маршрут добавлен в избранное", Toast.LENGTH_SHORT).show()
     }
 
     private fun notImplemented() {
@@ -560,6 +567,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
+        const val EXTRA_FROM_CODE = "favorite_from_code"
+        const val EXTRA_FROM_TITLE = "favorite_from_title"
+        const val EXTRA_TO_CODE = "favorite_to_code"
+        const val EXTRA_TO_TITLE = "favorite_to_title"
         private const val DAY_TODAY = 0
         private const val DAY_TOMORROW = 1
         private const val DAY_CUSTOM = 2
