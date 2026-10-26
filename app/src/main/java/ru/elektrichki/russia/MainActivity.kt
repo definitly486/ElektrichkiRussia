@@ -132,7 +132,7 @@ class MainActivity : AppCompatActivity() {
         val bookmark = ImageView(this).apply {
             setImageResource(R.drawable.ic_bookmark_outline)
             setPadding(Ui.dp(context, 12), Ui.dp(context, 12), Ui.dp(context, 12), Ui.dp(context, 12))
-            setOnClickListener { notImplemented() }
+            setOnClickListener { addCurrentStationsToFavorites() }
         }
         route.addView(bookmark, LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48)).apply {
             gravity = Gravity.CENTER_VERTICAL
@@ -224,6 +224,7 @@ class MainActivity : AppCompatActivity() {
                 setOnClickListener {
                     when (i) {
                         0 -> setTicketsTab(false)
+                        1 -> startActivity(Intent(this@MainActivity, FavoritesActivity::class.java))
                         3 -> openStationSchedule()
                         4 -> startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
                         else -> notImplemented()
@@ -329,6 +330,29 @@ class MainActivity : AppCompatActivity() {
     /** Четвёртая кнопка: открыть расписание и предложить выбрать станцию. */
     private fun openStationSchedule() {
         startActivity(Intent(this, StationScheduleActivity::class.java))
+    }
+
+
+    private fun addCurrentStationsToFavorites() {
+        val candidates = listOf(fromCode to fromTitle, toCode to toTitle)
+            .filter { it.first.isNotBlank() && it.second.isNotBlank() }
+        if (candidates.isEmpty()) {
+            Toast.makeText(this, "Сначала выберите станцию", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val favorites = org.json.JSONArray(prefs.getString("favorite_stations", "[]").orEmpty())
+        val existing = (0 until favorites.length()).mapNotNull { favorites.optJSONObject(it) }
+            .map { it.optString("code") }.toMutableSet()
+        var added = 0
+        candidates.forEach { (code, title) ->
+            if (existing.add(code)) {
+                favorites.put(JSONObject().put("code", code).put("title", title))
+                added++
+            }
+        }
+        prefs.edit().putString("favorite_stations", favorites.toString()).apply()
+        val message = if (added > 0) "Станция добавлена в избранное" else "Станция уже в избранном"
+        Toast.makeText(this, if (candidates.size > 1 && added > 0) "Станции добавлены в избранное" else message, Toast.LENGTH_SHORT).show()
     }
 
     private fun notImplemented() {
