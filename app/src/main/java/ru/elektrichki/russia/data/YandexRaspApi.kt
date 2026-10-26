@@ -27,8 +27,8 @@ class YandexRaspApi(context: Context) {
 
     fun saveApiKey(key: String) { prefs.edit().putString("api_key", key.trim()).apply() }
 
-    suspend fun stationSchedule(stationCode: String, date: String): ApiResult =
-        requestCached("station|$stationCode|$date") {
+    suspend fun stationSchedule(stationCode: String, date: String, offset: Int = 0): ApiResult =
+        requestCached(if (offset == 0) "station|$stationCode|$date" else "station|$stationCode|$date|$offset") {
             buildUrl("/schedule/", mapOf(
                 "station" to stationCode.trim(),
                 "date" to date,
@@ -36,7 +36,8 @@ class YandexRaspApi(context: Context) {
                 "event" to "departure",
                 "lang" to "ru_RU",
                 "format" to "json",
-                "limit" to "100"
+                "limit" to "100",
+                "offset" to offset.toString()
             ))
         }
 

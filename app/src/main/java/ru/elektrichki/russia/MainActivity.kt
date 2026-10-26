@@ -242,6 +242,7 @@ class MainActivity : AppCompatActivity() {
                 setOnClickListener {
                     when (i) {
                         0 -> setTicketsTab(false)
+                        3 -> openStationSchedule()
                         4 -> startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
                         else -> notImplemented()
                     }
@@ -354,6 +355,17 @@ class MainActivity : AppCompatActivity() {
     private fun pickDate() {
         pickDateLauncher.launch(Intent(this, DatePickActivity::class.java)
             .putExtra(DatePickActivity.EXTRA_SELECTED, currentDate()))
+    }
+
+    /** Четвёртая кнопка: расписание станции «Откуда» (в обе стороны). */
+    private fun openStationSchedule() {
+        if (fromCode.isBlank()) {
+            Toast.makeText(this, "Сначала выберите станцию в поле «Откуда»", Toast.LENGTH_SHORT).show()
+            return
+        }
+        startActivity(Intent(this, StationScheduleActivity::class.java)
+            .putExtra(StationScheduleActivity.EXTRA_CODE, fromCode)
+            .putExtra(StationScheduleActivity.EXTRA_TITLE, fromTitle))
     }
 
     private fun notImplemented() {
