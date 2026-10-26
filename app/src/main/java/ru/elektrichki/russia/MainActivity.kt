@@ -357,15 +357,9 @@ class MainActivity : AppCompatActivity() {
             .putExtra(DatePickActivity.EXTRA_SELECTED, currentDate()))
     }
 
-    /** Четвёртая кнопка: расписание станции «Откуда» (в обе стороны). */
+    /** Четвёртая кнопка: открыть расписание и предложить выбрать станцию. */
     private fun openStationSchedule() {
-        if (fromCode.isBlank()) {
-            Toast.makeText(this, "Сначала выберите станцию в поле «Откуда»", Toast.LENGTH_SHORT).show()
-            return
-        }
-        startActivity(Intent(this, StationScheduleActivity::class.java)
-            .putExtra(StationScheduleActivity.EXTRA_CODE, fromCode)
-            .putExtra(StationScheduleActivity.EXTRA_TITLE, fromTitle))
+        startActivity(Intent(this, StationScheduleActivity::class.java))
     }
 
     private fun notImplemented() {
