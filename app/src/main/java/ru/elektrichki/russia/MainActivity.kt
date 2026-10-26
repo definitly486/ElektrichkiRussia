@@ -363,11 +363,19 @@ class MainActivity : AppCompatActivity() {
 
         val favorites = org.json.JSONArray(prefs.getString("favorite_routes", "[]").orEmpty())
         val routeKey = "$fromCode|$toCode"
-        val exists = (0 until favorites.length()).mapNotNull { favorites.optJSONObject(it) }
-            .any { "${it.optString("from_code")}|${it.optString("to_code")}" == routeKey }
-        if (exists) {
+        val existingIndex = (0 until favorites.length()).firstOrNull { i ->
+            val item = favorites.optJSONObject(i) ?: return@firstOrNull false
+            "${item.optString("from_code")}|${item.optString("to_code")}" == routeKey
+        }
+
+        if (existingIndex != null) {
+            val updated = org.json.JSONArray()
+            for (i in 0 until favorites.length()) {
+                if (i != existingIndex) updated.put(favorites.optJSONObject(i))
+            }
+            prefs.edit().putString("favorite_routes", updated.toString()).apply()
             refreshBookmarkIcon()
-            Toast.makeText(this, "Маршрут уже в избранном", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Маршрут удалён из избранного", Toast.LENGTH_SHORT).show()
             return
         }
 
