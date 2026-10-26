@@ -50,6 +50,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var scroll: ScrollView
     private lateinit var fab: FrameLayout
     private lateinit var bookmark: ImageView
+    private lateinit var refreshIndicator: ImageView
+    private var pullStartY = 0f
+    private var pullDistance = 0f
+    private var isPullRefreshing = false
 
     private val pickStation = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         val d = r.data ?: return@registerForActivityResult
@@ -199,6 +203,60 @@ class MainActivity : AppCompatActivity() {
             addView(content, FrameLayout.LayoutParams(-1, -2))
         }
         body.addView(scroll, FrameLayout.LayoutParams(-1, -1))
+
+        refreshIndicator = ImageView(this).apply {
+            setImageResource(android.R.drawable.ic_popup_sync)
+            setColorFilter(Ui.WHITE)
+            alpha = 0f
+            visibility = View.INVISIBLE
+            elevation = Ui.dp(context, 8).toFloat()
+        }
+        body.addView(refreshIndicator, FrameLayout.LayoutParams(
+            Ui.dp(this, 36), Ui.dp(this, 36), Gravity.TOP or Gravity.CENTER_HORIZONTAL
+        ).apply { topMargin = Ui.dp(this@MainActivity, 8) })
+        scroll.setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                android.view.MotionEvent.ACTION_DOWN -> {
+                    pullStartY = event.y
+                    pullDistance = 0f
+                }
+                android.view.MotionEvent.ACTION_MOVE -> {
+                    val dy = event.y - pullStartY
+                    if (!isPullRefreshing && scroll.scrollY == 0 && dy > 0) {
+                        pullDistance = dy
+                        val shown = (dy / Ui.dp(this@MainActivity, 100)).coerceIn(0f, 1f)
+                        refreshIndicator.visibility = View.VISIBLE
+                        refreshIndicator.alpha = shown
+                        refreshIndicator.translationY = (dy * 0.45f).coerceAtMost(Ui.dp(this@MainActivity, 64).toFloat())
+                        refreshIndicator.rotation = dy * 2f
+                    }
+                }
+                android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
+                    if (!isPullRefreshing && scroll.scrollY == 0 && pullDistance >= Ui.dp(this@MainActivity, 80)) {
+                        isPullRefreshing = true
+                        refreshIndicator.animate().cancel()
+                        refreshIndicator.animate()
+                            .translationY(Ui.dp(this@MainActivity, 24).toFloat())
+                            .alpha(1f)
+                            .rotation(0f)
+                            .setDuration(180)
+                            .withEndAction {
+                                refreshIndicator.rotation = 0f
+                                spinRefreshIndicator()
+                            }
+                            .start()
+                        search()
+                    } else if (!isPullRefreshing) {
+                        refreshIndicator.animate().alpha(0f).translationY(0f).setDuration(160)
+                            .withEndAction { if (!isPullRefreshing) refreshIndicator.visibility = View.INVISIBLE }
+                            .start()
+                    }
+                    pullDistance = 0f
+                }
+            }
+            false
+        }
+
         fab = FrameLayout(this).apply {
             setBackgroundResource(R.drawable.bg_fab)
             elevation = Ui.dp(context, 6).toFloat()
@@ -410,14 +468,33 @@ class MainActivity : AppCompatActivity() {
 
     // ------------------------------------------------------------------ загрузка
 
+    private fun spinRefreshIndicator() {
+        if (!isPullRefreshing) return
+        refreshIndicator.animate().rotationBy(360f).setDuration(700)
+            .withEndAction { spinRefreshIndicator() }
+            .start()
+    }
+
+    private fun finishPullRefresh() {
+        isPullRefreshing = false
+        refreshIndicator.animate().cancel()
+        refreshIndicator.animate().alpha(0f).translationY(0f).rotation(0f).setDuration(180)
+            .withEndAction { refreshIndicator.visibility = View.INVISIBLE }
+            .start()
+    }
+
     private fun search() {
-        if (ticketsTab) return
+        if (ticketsTab) {
+            finishPullRefresh()
+            return
+        }
         if (sameDepartureAndArrival()) {
             job?.cancel()
+            finishPullRefresh()
             showSameStationMessage()
             return
         }
-        if (fromCode.isBlank()) { showPrompt(); return }
+        if (fromCode.isBlank()) { finishPullRefresh(); showPrompt(); return }
         val date = currentDate()
         showMessage("Загружаю расписание…")
         job?.cancel()
