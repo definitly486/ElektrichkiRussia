@@ -40,6 +40,7 @@ class StationScheduleActivity : AppCompatActivity() {
     private var cached = false
     private var job: Job? = null
 
+    private lateinit var stationTitleText: TextView
     private lateinit var dayToday: TextView
     private lateinit var dayTomorrow: TextView
     private lateinit var dayAll: TextView
@@ -64,10 +65,24 @@ class StationScheduleActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         window.statusBarColor = Ui.PANEL
         api = YandexRaspApi(this)
-        stationCode = intent.getStringExtra(EXTRA_CODE).orEmpty()
-        stationTitle = intent.getStringExtra(EXTRA_TITLE).orEmpty()
+        // Экран открывается без выбранной станции: пользователь выбирает её сам.
+        stationCode = ""
+        stationTitle = ""
         buildUi()
         refreshDays()
+        showMessage("Введите название станции")
+    }
+
+    private val pickStation = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
+        if (r.resultCode != RESULT_OK) return@registerForActivityResult
+        val data = r.data ?: return@registerForActivityResult
+        val code = data.getStringExtra(StationSearchActivity.EXTRA_CODE).orEmpty()
+        val title = data.getStringExtra(StationSearchActivity.EXTRA_TITLE).orEmpty()
+        if (code.isBlank() || title.isBlank()) return@registerForActivityResult
+        stationCode = code
+        stationTitle = title
+        stationTitleText.text = title
+        entries = emptyList()
         load()
     }
 
@@ -88,15 +103,31 @@ class StationScheduleActivity : AppCompatActivity() {
             gravity = Gravity.CENTER_VERTICAL
             setPadding(Ui.dp(context, 16), 0, Ui.dp(context, 8), 0)
         }
-        titleRow.addView(Ui.text(this, stationTitle, 24f, Ui.WHITE, true).apply {
+        stationTitleText = Ui.text(
+            this,
+            stationTitle.ifBlank { "Введите станцию" },
+            24f,
+            if (stationTitle.isBlank()) Ui.GRAY else Ui.WHITE,
+            true
+        ).apply {
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
-        }, LinearLayout.LayoutParams(0, -2, 1f))
+            gravity = Gravity.CENTER_VERTICAL
+            setOnClickListener {
+                pickStation.launch(Intent(this@StationScheduleActivity, StationSearchActivity::class.java)
+                    .putExtra(StationSearchActivity.EXTRA_IS_FROM, true))
+            }
+        }
+        titleRow.addView(stationTitleText, LinearLayout.LayoutParams(0, -2, 1f))
         titleRow.addView(ImageView(this).apply {
             setImageResource(R.drawable.ic_info)
             setPadding(Ui.dp(context, 10), Ui.dp(context, 10), Ui.dp(context, 10), Ui.dp(context, 10))
             setOnClickListener {
-                Toast.makeText(this@StationScheduleActivity, "$stationTitle · $stationCode", Toast.LENGTH_SHORT).show()
+                if (stationCode.isBlank()) {
+                    Toast.makeText(this@StationScheduleActivity, "Сначала выберите станцию", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this@StationScheduleActivity, "$stationTitle · $stationCode", Toast.LENGTH_SHORT).show()
+                }
             }
         }, LinearLayout.LayoutParams(Ui.dp(this, 52), Ui.dp(this, 52)))
         panel.addView(titleRow, LinearLayout.LayoutParams(-1, Ui.dp(this, 64)))
