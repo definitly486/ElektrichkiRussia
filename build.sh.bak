@@ -1,0 +1,15 @@
+#!/usr/bin/env sh
+set -eu
+cd "$(dirname "$0")"
+if [ -z "${ANDROID_HOME:-}" ] && [ -z "${ANDROID_SDK_ROOT:-}" ]; then
+  echo "Ошибка: задайте ANDROID_HOME или ANDROID_SDK_ROOT (путь к Android SDK)." >&2
+  exit 1
+fi
+chmod +x ./gradlew 2>/dev/null || true
+./gradlew --no-daemon assembleDebug
+APK="app/build/outputs/apk/debug/app-debug.apk"
+if [ -f "$APK" ]; then
+  OUT="app/build/outputs/apk/debug/Elektrichki-Russia-debug.apk"
+  cp "$APK" "$OUT"
+  echo "Готово: $OUT"
+fi

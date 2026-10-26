@@ -1,0 +1,13 @@
+.gradle/
+local.properties
+**/build/
+.idea/
+*.iml
+# Секретные API-ключи
+/api-key.properties
+/api-key.properties.local
+*.api-key
+
+# Ключи подписи
+*.jks
+*.keystore
