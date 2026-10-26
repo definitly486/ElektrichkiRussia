@@ -49,6 +49,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var content: LinearLayout
     private lateinit var scroll: ScrollView
     private lateinit var fab: FrameLayout
+    private lateinit var bookmark: ImageView
 
     private val pickStation = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         val d = r.data ?: return@registerForActivityResult
@@ -130,8 +131,7 @@ class MainActivity : AppCompatActivity() {
         fields.addView(toText, LinearLayout.LayoutParams(-1, Ui.dp(this, 46)))
         route.addView(fields, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = Ui.dp(this@MainActivity, 16) })
 
-        val bookmark = ImageView(this).apply {
-            setImageResource(R.drawable.ic_bookmark_outline)
+        bookmark = ImageView(this).apply {
             setPadding(Ui.dp(context, 12), Ui.dp(context, 12), Ui.dp(context, 12), Ui.dp(context, 12))
             setOnClickListener { addCurrentStationsToFavorites() }
         }
@@ -265,6 +265,7 @@ class MainActivity : AppCompatActivity() {
     private fun refreshFields() {
         fromText.text = if (fromTitle.isBlank()) "Откуда" else fromTitle
         toText.text = if (toTitle.isBlank()) "Куда" else toTitle
+        refreshBookmarkIcon()
     }
 
     private fun refreshTabs() {
@@ -334,6 +335,22 @@ class MainActivity : AppCompatActivity() {
     }
 
 
+    private fun refreshBookmarkIcon() {
+        if (!::bookmark.isInitialized) return
+        bookmark.setImageResource(
+            if (isCurrentRouteFavorite()) R.drawable.ic_bookmark_filled
+            else R.drawable.ic_bookmark_outline
+        )
+    }
+
+    private fun isCurrentRouteFavorite(): Boolean {
+        if (fromCode.isBlank() || toCode.isBlank()) return false
+        val favorites = org.json.JSONArray(prefs.getString("favorite_routes", "[]").orEmpty())
+        val routeKey = "$fromCode|$toCode"
+        return (0 until favorites.length()).mapNotNull { favorites.optJSONObject(it) }
+            .any { "${it.optString("from_code")}|${it.optString("to_code")}" == routeKey }
+    }
+
     private fun addCurrentStationsToFavorites() {
         if (fromCode.isBlank() || fromTitle.isBlank() || toCode.isBlank() || toTitle.isBlank()) {
             Toast.makeText(this, "Выберите станции отправления и назначения", Toast.LENGTH_SHORT).show()
@@ -349,6 +366,7 @@ class MainActivity : AppCompatActivity() {
         val exists = (0 until favorites.length()).mapNotNull { favorites.optJSONObject(it) }
             .any { "${it.optString("from_code")}|${it.optString("to_code")}" == routeKey }
         if (exists) {
+            refreshBookmarkIcon()
             Toast.makeText(this, "Маршрут уже в избранном", Toast.LENGTH_SHORT).show()
             return
         }
@@ -359,6 +377,7 @@ class MainActivity : AppCompatActivity() {
             .put("to_code", toCode)
             .put("to_title", toTitle))
         prefs.edit().putString("favorite_routes", favorites.toString()).apply()
+        refreshBookmarkIcon()
         Toast.makeText(this, "Маршрут добавлен в избранное", Toast.LENGTH_SHORT).show()
     }
 
