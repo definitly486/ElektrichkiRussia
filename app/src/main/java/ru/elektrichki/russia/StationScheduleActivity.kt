@@ -65,12 +65,17 @@ class StationScheduleActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         window.statusBarColor = Ui.PANEL
         api = YandexRaspApi(this)
-        // Экран открывается без выбранной станции: пользователь выбирает её сам.
-        stationCode = ""
-        stationTitle = ""
+        stationCode = intent.getStringExtra(EXTRA_CODE).orEmpty()
+        stationTitle = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         buildUi()
         refreshDays()
-        showMessage("Введите название станции")
+        if (stationCode.isNotBlank() && stationTitle.isNotBlank()) {
+            stationTitleText.text = stationTitle
+            stationTitleText.setTextColor(Ui.WHITE)
+            load()
+        } else {
+            showMessage("Введите название станции")
+        }
     }
 
     private val pickStation = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
@@ -200,6 +205,7 @@ class StationScheduleActivity : AppCompatActivity() {
                 setOnClickListener {
                     when (i) {
                         0 -> finish()
+                        1 -> startActivity(Intent(this@StationScheduleActivity, FavoritesActivity::class.java))
                         3 -> {}
                         4 -> startActivity(Intent(this@StationScheduleActivity, SettingsActivity::class.java))
                         else -> Toast.makeText(this@StationScheduleActivity, "Этот раздел пока не реализован", Toast.LENGTH_SHORT).show()
