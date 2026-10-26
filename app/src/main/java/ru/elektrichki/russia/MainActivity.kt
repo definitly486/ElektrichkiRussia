@@ -385,6 +385,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun search() {
         if (ticketsTab) return
+        if (sameDepartureAndArrival()) {
+            job?.cancel()
+            showSameStationMessage()
+            return
+        }
         if (fromCode.isBlank()) { showPrompt(); return }
         val date = currentDate()
         showMessage("Загружаю расписание…")
@@ -397,6 +402,37 @@ class MainActivity : AppCompatActivity() {
                 showMessage("Не удалось загрузить данные.\n${e.message ?: "Неизвестная ошибка"}\n\nПроверьте API-ключ и подключение к интернету.")
             }
         }
+    }
+
+    private fun sameDepartureAndArrival(): Boolean {
+        val sameCode = fromCode.isNotBlank() && toCode.isNotBlank() &&
+            fromCode.equals(toCode, ignoreCase = true)
+        val sameTitle = fromTitle.isNotBlank() && toTitle.isNotBlank() &&
+            fromTitle.trim().equals(toTitle.trim(), ignoreCase = true)
+        return sameCode || sameTitle
+    }
+
+    private fun showSameStationMessage() {
+        content.removeAllViews()
+        nextView = null
+        val col = Ui.center(this).apply {
+            gravity = Gravity.CENTER
+            setPadding(Ui.dp(context, 32), Ui.dp(context, 24), Ui.dp(context, 32), Ui.dp(context, 24))
+        }
+        col.addView(Ui.text(this, "☹", 64f, Ui.WHITE).apply {
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, Ui.dp(this@MainActivity, 20))
+        }, LinearLayout.LayoutParams(-1, -2))
+        col.addView(Ui.text(
+            this,
+            "Пункт прибытия совпадает с пунктом отправления",
+            20f,
+            Ui.WHITE
+        ).apply {
+            gravity = Gravity.CENTER
+            setLineSpacing(0f, 1.1f)
+        }, LinearLayout.LayoutParams(-1, -2))
+        content.addView(col, LinearLayout.LayoutParams(-1, -1))
     }
 
     private fun showPrompt() {
