@@ -8,6 +8,8 @@
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="false">
         <activity android:name=".SettingsActivity" android:exported="false" />
+        <activity android:name=".DatePickActivity" android:exported="false" />
+        <activity android:name=".StationScheduleActivity" android:exported="false" />
         <activity
             android:name=".StationSearchActivity"
             android:exported="false"
