@@ -1,8 +1,12 @@
 package ru.elektrichki.russia
 
 import android.os.Bundle
+import android.text.InputType
 import android.view.Gravity
-import android.widget.*
+import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
@@ -15,43 +19,70 @@ class SettingsActivity : AppCompatActivity() {
         val api = YandexRaspApi(this)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(22, 24, 22, 24)
-            setBackgroundColor(0xFFF5F3F1.toInt())
+            setBackgroundColor(Ui.BG)
+            fitsSystemWindows = true
         }
         setContentView(root)
-        root.addView(TextView(this).apply {
-            text = "Настройки"; textSize = 26f; setTextColor(0xFF201E21.toInt())
+
+        root.addView(Ui.text(this, "Настройки", 26f, Ui.WHITE, true).apply {
+            setBackgroundColor(Ui.PANEL)
+            setPadding(Ui.dp(context, 16), Ui.dp(context, 20), Ui.dp(context, 16), Ui.dp(context, 20))
         })
-        root.addView(TextView(this).apply {
-            text = "API-ключ Яндекс Расписаний"; textSize = 16f; setPadding(0, 18, 0, 6)
-            setTextColor(0xFF201E21.toInt())
-        })
+
+        val body = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(Ui.dp(context, 16), Ui.dp(context, 20), Ui.dp(context, 16), Ui.dp(context, 16))
+        }
+        root.addView(body)
+
+        body.addView(Ui.text(this, "API-ключ Яндекс Расписаний", 16f, Ui.GRAY_LIGHT))
         val key = EditText(this).apply {
             hint = "Вставьте API-ключ"
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            textSize = 18f
+            setTextColor(Ui.WHITE)
+            setHintTextColor(Ui.GRAY)
+            setBackgroundColor(Ui.PANEL)
+            setPadding(Ui.dp(context, 14), Ui.dp(context, 12), Ui.dp(context, 14), Ui.dp(context, 12))
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             setText(api.apiKey())
         }
-        root.addView(key)
-        root.addView(Button(this).apply {
-            text = "Сохранить ключ"
-            setOnClickListener {
-                api.saveApiKey(key.text.toString())
-                Toast.makeText(this@SettingsActivity, "Ключ сохранён на устройстве", Toast.LENGTH_SHORT).show()
+        body.addView(key, LinearLayout.LayoutParams(-1, -2).apply { topMargin = Ui.dp(this@SettingsActivity, 8) })
+
+        body.addView(yellowButton("Сохранить ключ") {
+            api.saveApiKey(key.text.toString())
+            Toast.makeText(this, "Ключ сохранён на устройстве", Toast.LENGTH_SHORT).show()
+        }, LinearLayout.LayoutParams(-1, Ui.dp(this, 48)).apply { topMargin = Ui.dp(this@SettingsActivity, 16) })
+
+        body.addView(Ui.text(this,
+            "Получите ключ в Кабинете разработчика Яндекса и активируйте API Расписаний. " +
+                "Ключ хранится локально в настройках приложения. Не публикуйте его в Git.",
+            14f, Ui.GRAY).apply { setPadding(0, Ui.dp(context, 16), 0, Ui.dp(context, 16)); setLineSpacing(0f, 1.1f) })
+
+        body.addView(darkButton("Очистить офлайн-кэш") {
+            lifecycleScope.launch {
+                ScheduleDatabase.get(this@SettingsActivity).scheduleDao().clear()
+                runOnUiThread { Toast.makeText(this@SettingsActivity, "Кэш очищен", Toast.LENGTH_SHORT).show() }
             }
-        })
-        root.addView(TextView(this).apply {
-            text = "Получите ключ в Кабинете разработчика Яндекса и активируйте API Расписаний. Ключ хранится локально в настройках приложения. Не публикуйте его в Git."
-            textSize = 14f; setPadding(0, 12, 0, 12); setTextColor(0xFF625E62.toInt())
-        })
-        root.addView(Button(this).apply {
-            text = "Очистить офлайн-кэш"
-            setOnClickListener {
-                lifecycleScope.launch {
-                    ScheduleDatabase.get(this@SettingsActivity).scheduleDao().clear()
-                    runOnUiThread { Toast.makeText(this@SettingsActivity, "Кэш очищен", Toast.LENGTH_SHORT).show() }
-                }
-            }
-        })
-        root.addView(Button(this).apply { text = "Назад"; setOnClickListener { finish() } })
+        }, LinearLayout.LayoutParams(-1, Ui.dp(this, 48)))
+        body.addView(darkButton("Назад") { finish() },
+            LinearLayout.LayoutParams(-1, Ui.dp(this, 48)).apply { topMargin = Ui.dp(this@SettingsActivity, 12) })
+    }
+
+    private fun yellowButton(label: String, onClick: () -> Unit) = TextView(this).apply {
+        text = label
+        textSize = 18f
+        setTextColor(0xFF201E21.toInt())
+        gravity = Gravity.CENTER
+        setBackgroundResource(R.drawable.bg_button_yellow)
+        setOnClickListener { onClick() }
+    }
+
+    private fun darkButton(label: String, onClick: () -> Unit) = TextView(this).apply {
+        text = label
+        textSize = 18f
+        setTextColor(Ui.WHITE)
+        gravity = Gravity.CENTER
+        setBackgroundResource(R.drawable.bg_segment_selected)
+        setOnClickListener { onClick() }
     }
 }
