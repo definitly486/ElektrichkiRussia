@@ -58,9 +58,12 @@ class MainActivity : AppCompatActivity() {
         buttons.addView(button("Расписание станции") { loadStation() }, LinearLayout.LayoutParams(0, -2, 1f))
         buttons.addView(button("Найти маршрут") { loadRoute() }, LinearLayout.LayoutParams(0, -2, 1f))
         root.addView(buttons)
-        root.addView(button("Настройки API-ключа") {
-            startActivity(Intent(this, SettingsActivity::class.java))
-        })
+        // Если ключ зашит при сборке (api-key.properties), настройка ключа в приложении не нужна.
+        if (BuildConfig.YANDEX_RASP_API_KEY.isBlank()) {
+            root.addView(button("Настройки API-ключа") {
+                startActivity(Intent(this, SettingsActivity::class.java))
+            })
+        }
         root.addView(text("Введите часть названия станции, выберите результат из списка и затем загрузите расписание или маршрут.", 13f, 0xFF625E62.toInt()))
         root.addView(space(10))
         output = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
