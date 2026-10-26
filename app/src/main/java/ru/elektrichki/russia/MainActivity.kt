@@ -502,7 +502,9 @@ class MainActivity : AppCompatActivity() {
             try {
                 val result = if (toCode.isBlank()) api.stationSchedule(fromCode, date) else api.route(fromCode, toCode, date)
                 render(result.json, result.fromCache, result.warning, date)
+                finishPullRefresh()
             } catch (e: Exception) {
+                finishPullRefresh()
                 showMessage("Не удалось загрузить данные.\n${e.message ?: "Неизвестная ошибка"}\n\nПроверьте API-ключ и подключение к интернету.")
             }
         }
