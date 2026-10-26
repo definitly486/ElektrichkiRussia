@@ -38,8 +38,6 @@ class MainActivity : AppCompatActivity() {
     private var job: Job? = null
 
     // views
-    private lateinit var tabSuburban: TextView
-    private lateinit var tabTickets: TextView
     private lateinit var fromText: TextView
     private lateinit var toText: TextView
     private lateinit var ticketsExtra: LinearLayout
@@ -101,22 +99,6 @@ class MainActivity : AppCompatActivity() {
             fitsSystemWindows = true
         }
 
-        // Переключатель «Электрички | Ж/д билеты»
-        val toggleWrap = FrameLayout(this).apply {
-            setPadding(0, Ui.dp(context, 12), 0, Ui.dp(context, 12))
-        }
-        val toggle = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            setBackgroundResource(R.drawable.bg_segment_container)
-            setPadding(Ui.dp(context, 4), Ui.dp(context, 4), Ui.dp(context, 4), Ui.dp(context, 4))
-        }
-        tabSuburban = segment("Электрички") { setTicketsTab(false) }
-        tabTickets = segment("Ж/д билеты") { setTicketsTab(true) }
-        toggle.addView(tabSuburban, LinearLayout.LayoutParams(Ui.dp(this, 116), Ui.dp(this, 40)))
-        toggle.addView(tabTickets, LinearLayout.LayoutParams(Ui.dp(this, 116), Ui.dp(this, 40)))
-        toggleWrap.addView(toggle, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER_HORIZONTAL))
-        root.addView(toggleWrap)
-
         // Панель маршрута A → B
         val panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -150,7 +132,7 @@ class MainActivity : AppCompatActivity() {
         val bookmark = ImageView(this).apply {
             setImageResource(R.drawable.ic_bookmark_outline)
             setPadding(Ui.dp(context, 12), Ui.dp(context, 12), Ui.dp(context, 12), Ui.dp(context, 12))
-            setOnClickListener { notImplemented() }
+            setOnClickListener { addCurrentStationsToFavorites() }
         }
         route.addView(bookmark, LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48)).apply {
             gravity = Gravity.CENTER_VERTICAL
@@ -242,6 +224,7 @@ class MainActivity : AppCompatActivity() {
                 setOnClickListener {
                     when (i) {
                         0 -> setTicketsTab(false)
+                        1 -> startActivity(Intent(this@MainActivity, FavoritesActivity::class.java))
                         3 -> openStationSchedule()
                         4 -> startActivity(Intent(this@MainActivity, SettingsActivity::class.java))
                         else -> notImplemented()
@@ -252,13 +235,6 @@ class MainActivity : AppCompatActivity() {
         }
         root.addView(nav)
         setContentView(root)
-    }
-
-    private fun segment(label: String, onClick: () -> Unit) = TextView(this).apply {
-        text = label
-        textSize = 20f
-        gravity = Gravity.CENTER
-        setOnClickListener { onClick() }
     }
 
     private fun badge(letter: String, bg: Int) = TextView(this).apply {
@@ -291,12 +267,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun refreshTabs() {
-        val sel = { v: TextView, on: Boolean ->
-            v.setBackgroundResource(if (on) R.drawable.bg_segment_selected else 0)
-            v.setTextColor(if (on) Ui.WHITE else Ui.GRAY)
-        }
-        sel(tabSuburban, !ticketsTab)
-        sel(tabTickets, ticketsTab)
         ticketsExtra.visibility = if (ticketsTab) View.VISIBLE else View.GONE
         daysRow.visibility = if (ticketsTab) View.GONE else View.VISIBLE
         fab.visibility = if (ticketsTab) View.GONE else View.VISIBLE
@@ -362,6 +332,29 @@ class MainActivity : AppCompatActivity() {
         startActivity(Intent(this, StationScheduleActivity::class.java))
     }
 
+
+    private fun addCurrentStationsToFavorites() {
+        val candidates = listOf(fromCode to fromTitle, toCode to toTitle)
+            .filter { it.first.isNotBlank() && it.second.isNotBlank() }
+        if (candidates.isEmpty()) {
+            Toast.makeText(this, "Сначала выберите станцию", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val favorites = org.json.JSONArray(prefs.getString("favorite_stations", "[]").orEmpty())
+        val existing = (0 until favorites.length()).mapNotNull { favorites.optJSONObject(it) }
+            .map { it.optString("code") }.toMutableSet()
+        var added = 0
+        candidates.forEach { (code, title) ->
+            if (existing.add(code)) {
+                favorites.put(JSONObject().put("code", code).put("title", title))
+                added++
+            }
+        }
+        prefs.edit().putString("favorite_stations", favorites.toString()).apply()
+        val message = if (added > 0) "Станция добавлена в избранное" else "Станция уже в избранном"
+        Toast.makeText(this, if (candidates.size > 1 && added > 0) "Станции добавлены в избранное" else message, Toast.LENGTH_SHORT).show()
+    }
+
     private fun notImplemented() {
         Toast.makeText(this, "Этот раздел пока не реализован", Toast.LENGTH_SHORT).show()
     }
@@ -385,6 +378,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun search() {
         if (ticketsTab) return
+        if (sameDepartureAndArrival()) {
+            job?.cancel()
+            showSameStationMessage()
+            return
+        }
         if (fromCode.isBlank()) { showPrompt(); return }
         val date = currentDate()
         showMessage("Загружаю расписание…")
@@ -397,6 +395,37 @@ class MainActivity : AppCompatActivity() {
                 showMessage("Не удалось загрузить данные.\n${e.message ?: "Неизвестная ошибка"}\n\nПроверьте API-ключ и подключение к интернету.")
             }
         }
+    }
+
+    private fun sameDepartureAndArrival(): Boolean {
+        val sameCode = fromCode.isNotBlank() && toCode.isNotBlank() &&
+            fromCode.equals(toCode, ignoreCase = true)
+        val sameTitle = fromTitle.isNotBlank() && toTitle.isNotBlank() &&
+            fromTitle.trim().equals(toTitle.trim(), ignoreCase = true)
+        return sameCode || sameTitle
+    }
+
+    private fun showSameStationMessage() {
+        content.removeAllViews()
+        nextView = null
+        val col = Ui.center(this).apply {
+            gravity = Gravity.CENTER
+            setPadding(Ui.dp(context, 32), Ui.dp(context, 24), Ui.dp(context, 32), Ui.dp(context, 24))
+        }
+        col.addView(Ui.text(this, "☹", 64f, Ui.WHITE).apply {
+            gravity = Gravity.CENTER
+            setPadding(0, 0, 0, Ui.dp(this@MainActivity, 20))
+        }, LinearLayout.LayoutParams(-1, -2))
+        col.addView(Ui.text(
+            this,
+            "Пункт прибытия совпадает с пунктом отправления",
+            20f,
+            Ui.WHITE
+        ).apply {
+            gravity = Gravity.CENTER
+            setLineSpacing(0f, 1.1f)
+        }, LinearLayout.LayoutParams(-1, -2))
+        content.addView(col, LinearLayout.LayoutParams(-1, -1))
     }
 
     private fun showPrompt() {
