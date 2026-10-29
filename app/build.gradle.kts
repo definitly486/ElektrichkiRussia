@@ -95,6 +95,7 @@ android {
 dependencies {
     // AppCompat и Room убраны: весь UI строится в коде на стандартных виджетах,
     // кэш — один простой SQLite-запрос без ORM.
+    implementation("androidx.core:core:1.15.0")
     implementation("androidx.activity:activity:1.9.3")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
