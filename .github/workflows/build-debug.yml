@@ -1,0 +1,73 @@
+name: Build debug APK
+
+# Сборка debug после каждого пуша в любую ветку (и вручную из вкладки Actions)
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+
+# нужен для публикации APK в Releases
+permissions:
+  contents: write
+
+concurrency:
+  group: build-debug-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build debug APK
+        env:
+          # необязательно: ключ Яндекс Расписаний (Settings → Secrets and variables → Actions)
+          YANDEX_RASP_API_KEY: ${{ secrets.YANDEX_RASP_API_KEY }}
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon assembleDebug
+
+      - name: Prepare APK
+        id: apk
+        run: |
+          BRANCH="${GITHUB_REF_NAME//\//-}"
+          SHORT="${GITHUB_SHA::7}"
+          NAME="ElektrichkiRussia-debug-${BRANCH}-${SHORT}.apk"
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk "dist/${NAME}"
+          echo "name=${NAME}" >> "$GITHUB_OUTPUT"
+          echo "branch=${BRANCH}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.apk.outputs.name }}
+          path: dist/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      # Прикрепляем APK к релизу debug-<ветка>: всегда свежая сборка этой ветки,
+      # скачивается прямо с телефона со страницы Releases.
+      - name: Publish to Releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="debug-${{ steps.apk.outputs.branch }}"
+          gh release delete "$TAG" --cleanup-tag --yes || true
+          gh release create "$TAG" "dist/${{ steps.apk.outputs.name }}" \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Debug: ${GITHUB_REF_NAME} (${GITHUB_SHA::7})" \
+            --notes "Автоматическая debug-сборка ветки \`${GITHUB_REF_NAME}\`, коммит ${GITHUB_SHA}."
