@@ -271,25 +271,36 @@ class MainActivity : BaseActivity() {
                 android.view.MotionEvent.ACTION_DOWN -> {
                     pullStartY = event.y
                     pullDistance = 0f
-                    swipeStartY = event.y
+                    swipeStartY = event.rawY
                     swipeHandled = false
                     collapsedAtGestureStart = panelCollapsed
                 }
                 android.view.MotionEvent.ACTION_MOVE -> {
                     val dy = event.y - pullStartY
-                    // Свайп вверх — прячем шапку, свайп вниз — возвращаем
-                    val swipeDy = event.y - swipeStartY
-                    val threshold = Ui.dp(this@MainActivity, 24)
-                    if (!swipeHandled && !ticketsTab) {
-                        if (swipeDy < -threshold && !panelCollapsed) {
-                            swipeHandled = true
-                            setPanelCollapsed(true)
-                        } else if (swipeDy > threshold && panelCollapsed) {
-                            swipeHandled = true
-                            setPanelCollapsed(false)
+                    // Свайп вверх — прячем шапку, вниз — показываем; работает непрерывно,
+                    // без отрыва пальца. rawY, потому что список двигается при смене высоты шапки.
+                    val y = event.rawY
+                    val threshold = Ui.dp(this@MainActivity, 20)
+                    if (!ticketsTab) {
+                        if (!panelCollapsed) {
+                            // ждём движения вверх; якорь — самая нижняя точка пальца
+                            if (y > swipeStartY) swipeStartY = y
+                            if (swipeStartY - y > threshold) {
+                                setPanelCollapsed(true)
+                                swipeHandled = true
+                                swipeStartY = y
+                            }
+                        } else {
+                            // ждём движения вниз; якорь — самая верхняя точка пальца
+                            if (y < swipeStartY) swipeStartY = y
+                            if (y - swipeStartY > threshold) {
+                                setPanelCollapsed(false)
+                                swipeHandled = true
+                                swipeStartY = y
+                            }
                         }
                     }
-                    if (!isPullRefreshing && !collapsedAtGestureStart && scroll.scrollY == 0 && dy > 0) {
+                    if (!isPullRefreshing && !collapsedAtGestureStart && !swipeHandled && scroll.scrollY == 0 && dy > 0) {
                         pullDistance = dy
                         val shown = (dy / Ui.dp(this@MainActivity, 100)).coerceIn(0f, 1f)
                         refreshIndicator.visibility = View.VISIBLE
@@ -299,7 +310,7 @@ class MainActivity : BaseActivity() {
                     }
                 }
                 android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                    if (!isPullRefreshing && !collapsedAtGestureStart && scroll.scrollY == 0 && pullDistance >= Ui.dp(this@MainActivity, 80)) {
+                    if (!isPullRefreshing && !collapsedAtGestureStart && !swipeHandled && scroll.scrollY == 0 && pullDistance >= Ui.dp(this@MainActivity, 80)) {
                         isPullRefreshing = true
                         refreshIndicator.animate().cancel()
                         refreshIndicator.animate()
