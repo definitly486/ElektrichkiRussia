@@ -93,10 +93,7 @@ android {
 }
 
 dependencies {
-    // AppCompat и Room убраны: весь UI строится в коде на стандартных виджетах,
-    // кэш — один простой SQLite-запрос без ORM.
-    implementation("androidx.core:core:1.15.0")
-    implementation("androidx.activity:activity:1.9.3")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
+    // Без AndroidX: UI строится в коде на стандартных виджетах, кэш — на SQLiteOpenHelper,
+    // BaseActivity заменяет lifecycleScope и Activity Result API. Ресурсов библиотек в APK нет.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 }

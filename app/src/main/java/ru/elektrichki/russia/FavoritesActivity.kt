@@ -7,12 +7,11 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import androidx.activity.ComponentActivity
 import org.json.JSONArray
 import org.json.JSONObject
 
 /** Список сохранённых маршрутов. */
-class FavoritesActivity : ComponentActivity() {
+class FavoritesActivity : BaseActivity() {
     private val prefs by lazy { getSharedPreferences("ui", MODE_PRIVATE) }
     private lateinit var list: LinearLayout
 

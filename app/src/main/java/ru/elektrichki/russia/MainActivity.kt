@@ -10,9 +10,6 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.ComponentActivity
-import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -23,7 +20,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-class MainActivity : ComponentActivity() {
+class MainActivity : BaseActivity() {
     private lateinit var api: YandexRaspApi
     private val prefs by lazy { getSharedPreferences("ui", MODE_PRIVATE) }
 
@@ -55,9 +52,9 @@ class MainActivity : ComponentActivity() {
     private var pullDistance = 0f
     private var isPullRefreshing = false
 
-    private val pickStation = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
-        val d = r.data ?: return@registerForActivityResult
-        if (r.resultCode != RESULT_OK) return@registerForActivityResult
+    private val pickStation = registerForResult { r ->
+        val d = r.data ?: return@registerForResult
+        if (r.resultCode != RESULT_OK) return@registerForResult
         val code = d.getStringExtra(StationSearchActivity.EXTRA_CODE).orEmpty()
         val title = d.getStringExtra(StationSearchActivity.EXTRA_TITLE).orEmpty()
         if (d.getBooleanExtra(StationSearchActivity.EXTRA_IS_FROM, true)) {
@@ -70,10 +67,10 @@ class MainActivity : ComponentActivity() {
         if (!ticketsTab) search()
     }
 
-    private val pickDateLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
-        if (r.resultCode != RESULT_OK) return@registerForActivityResult
+    private val pickDateLauncher = registerForResult { r ->
+        if (r.resultCode != RESULT_OK) return@registerForResult
         val date = r.data?.getStringExtra(DatePickActivity.EXTRA_DATE).orEmpty()
-        if (date.isBlank()) return@registerForActivityResult
+        if (date.isBlank()) return@registerForResult
         customDate = date
         dayMode = DAY_CUSTOM
         refreshDays()
