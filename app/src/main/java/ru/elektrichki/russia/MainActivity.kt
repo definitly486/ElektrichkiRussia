@@ -51,6 +51,7 @@ class MainActivity : BaseActivity() {
     private lateinit var bookmark: ImageView
     private lateinit var refreshIndicator: ImageView
     private lateinit var panel: LinearLayout
+    private lateinit var collapsedBar: TextView
     private var panelCollapsed = false
     private var panelAnimator: ValueAnimator? = null
     private var swipeStartY = 0f
@@ -200,6 +201,20 @@ class MainActivity : BaseActivity() {
         panel.addView(daysRow, LinearLayout.LayoutParams(-1, Ui.dp(this, 64)))
         root.addView(panel)
 
+        // Тонкая полоска вместо свёрнутой шапки: «A → B · день»
+        collapsedBar = TextView(this).apply {
+            textSize = 16f
+            setTextColor(Ui.WHITE)
+            gravity = Gravity.CENTER_VERTICAL
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            setBackgroundColor(Ui.PANEL)
+            setPadding(Ui.dp(context, 16), 0, Ui.dp(context, 16), 0)
+            visibility = View.GONE
+            setOnClickListener { setPanelCollapsed(false) }
+        }
+        root.addView(collapsedBar, LinearLayout.LayoutParams(-1, Ui.dp(this, 40)))
+
         // Список + плавающая кнопка
         val body = FrameLayout(this)
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -343,6 +358,7 @@ class MainActivity : BaseActivity() {
     private fun refreshFields() {
         fromText.text = if (fromTitle.isBlank()) "Откуда" else fromTitle
         toText.text = if (toTitle.isBlank()) "Куда" else toTitle
+        refreshCollapsedBar()
         refreshBookmarkIcon()
     }
 
@@ -363,13 +379,28 @@ class MainActivity : BaseActivity() {
         style(dayTomorrow, dayMode == DAY_TOMORROW)
         style(dayAll, dayMode == DAY_CUSTOM)
         dayAll.text = if (dayMode == DAY_CUSTOM && customDate.isNotBlank()) Ui.dateShort(customDate) else "Все дни"
+        refreshCollapsedBar()
         ticketDate.text = Ui.dateLong(currentDate())
+    }
+
+    private fun refreshCollapsedBar() {
+        if (!::collapsedBar.isInitialized) return
+        val from = fromTitle.ifBlank { "Откуда" }
+        val to = toTitle.ifBlank { "Куда" }
+        val day = when (dayMode) {
+            DAY_TOMORROW -> "Завтра"
+            DAY_CUSTOM -> if (customDate.isNotBlank()) Ui.dateShort(customDate) else "Сегодня"
+            else -> "Сегодня"
+        }
+        collapsedBar.text = "$from → $to · $day"
     }
 
     /** Плавно сворачивает/разворачивает верхнюю панель (маршрут + дни). */
     private fun setPanelCollapsed(collapse: Boolean, animate: Boolean = true) {
         if (collapse == panelCollapsed) return
         panelCollapsed = collapse
+        refreshCollapsedBar()
+        collapsedBar.visibility = if (collapse) View.VISIBLE else View.GONE
         panelAnimator?.cancel()
         val lp = panel.layoutParams
         val from = panel.height
