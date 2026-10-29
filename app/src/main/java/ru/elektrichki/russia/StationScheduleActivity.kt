@@ -12,7 +12,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -28,7 +28,7 @@ import java.util.Locale
  * Расписание станции: название станции, «В любую сторону», выбор дня и список всех
  * отправлений со станции (в обе стороны), как в Яндекс Электричках.
  */
-class StationScheduleActivity : AppCompatActivity() {
+class StationScheduleActivity : ComponentActivity() {
     private lateinit var api: YandexRaspApi
     private var stationCode = ""
     private var stationTitle = ""

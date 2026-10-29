@@ -11,7 +11,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -23,7 +23,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : ComponentActivity() {
     private lateinit var api: YandexRaspApi
     private val prefs by lazy { getSharedPreferences("ui", MODE_PRIVATE) }
 
@@ -453,7 +453,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun checkApiKey() {
         if (api.apiKey().isBlank()) {
-            androidx.appcompat.app.AlertDialog.Builder(this)
+            android.app.AlertDialog.Builder(this)
                 .setTitle("API-ключ не указан")
                 .setMessage(
                     "Не найден API-ключ Яндекс Расписаний.\n\n" +

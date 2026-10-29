@@ -7,13 +7,13 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 import ru.elektrichki.russia.data.ScheduleDatabase
 import ru.elektrichki.russia.data.YandexRaspApi
 
-class SettingsActivity : AppCompatActivity() {
+class SettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val api = YandexRaspApi(this)

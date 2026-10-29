@@ -14,7 +14,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -23,7 +23,7 @@ import ru.elektrichki.russia.data.StationMatch
 import ru.elektrichki.russia.data.YandexRaspApi
 
 /** Полноэкранный поиск станции: стрелка назад, поле ввода, жёлтая линия, список результатов. */
-class StationSearchActivity : AppCompatActivity() {
+class StationSearchActivity : ComponentActivity() {
     private lateinit var api: YandexRaspApi
     private lateinit var results: LinearLayout
     private lateinit var input: EditText
