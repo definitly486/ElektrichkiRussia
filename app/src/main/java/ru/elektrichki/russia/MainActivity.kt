@@ -1,9 +1,11 @@
 package ru.elektrichki.russia
 
 import android.content.Intent
+import android.animation.ValueAnimator
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -48,6 +50,12 @@ class MainActivity : BaseActivity() {
     private lateinit var fab: FrameLayout
     private lateinit var bookmark: ImageView
     private lateinit var refreshIndicator: ImageView
+    private lateinit var panel: LinearLayout
+    private var panelCollapsed = false
+    private var panelAnimator: ValueAnimator? = null
+    private var swipeStartY = 0f
+    private var swipeHandled = false
+    private var collapsedAtGestureStart = false
     private var pullStartY = 0f
     private var pullDistance = 0f
     private var isPullRefreshing = false
@@ -103,7 +111,7 @@ class MainActivity : BaseActivity() {
         }
 
         // Панель маршрута A → B
-        val panel = LinearLayout(this).apply {
+        panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Ui.PANEL)
         }
@@ -216,10 +224,25 @@ class MainActivity : BaseActivity() {
                 android.view.MotionEvent.ACTION_DOWN -> {
                     pullStartY = event.y
                     pullDistance = 0f
+                    swipeStartY = event.y
+                    swipeHandled = false
+                    collapsedAtGestureStart = panelCollapsed
                 }
                 android.view.MotionEvent.ACTION_MOVE -> {
                     val dy = event.y - pullStartY
-                    if (!isPullRefreshing && scroll.scrollY == 0 && dy > 0) {
+                    // Свайп вверх — прячем шапку, свайп вниз — возвращаем
+                    val swipeDy = event.y - swipeStartY
+                    val threshold = Ui.dp(this@MainActivity, 24)
+                    if (!swipeHandled && !ticketsTab) {
+                        if (swipeDy < -threshold && !panelCollapsed) {
+                            swipeHandled = true
+                            setPanelCollapsed(true)
+                        } else if (swipeDy > threshold && panelCollapsed) {
+                            swipeHandled = true
+                            setPanelCollapsed(false)
+                        }
+                    }
+                    if (!isPullRefreshing && !collapsedAtGestureStart && scroll.scrollY == 0 && dy > 0) {
                         pullDistance = dy
                         val shown = (dy / Ui.dp(this@MainActivity, 100)).coerceIn(0f, 1f)
                         refreshIndicator.visibility = View.VISIBLE
@@ -229,7 +252,7 @@ class MainActivity : BaseActivity() {
                     }
                 }
                 android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                    if (!isPullRefreshing && scroll.scrollY == 0 && pullDistance >= Ui.dp(this@MainActivity, 80)) {
+                    if (!isPullRefreshing && !collapsedAtGestureStart && scroll.scrollY == 0 && pullDistance >= Ui.dp(this@MainActivity, 80)) {
                         isPullRefreshing = true
                         refreshIndicator.animate().cancel()
                         refreshIndicator.animate()
@@ -343,7 +366,48 @@ class MainActivity : BaseActivity() {
         ticketDate.text = Ui.dateLong(currentDate())
     }
 
+    /** Плавно сворачивает/разворачивает верхнюю панель (маршрут + дни). */
+    private fun setPanelCollapsed(collapse: Boolean, animate: Boolean = true) {
+        if (collapse == panelCollapsed) return
+        panelCollapsed = collapse
+        panelAnimator?.cancel()
+        val lp = panel.layoutParams
+        val from = panel.height
+        val to = if (collapse) 0 else {
+            val width = if (panel.width > 0) panel.width else resources.displayMetrics.widthPixels
+            panel.measure(
+                View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+            )
+            panel.measuredHeight
+        }
+        if (!animate) {
+            lp.height = if (collapse) 0 else ViewGroup.LayoutParams.WRAP_CONTENT
+            panel.layoutParams = lp
+            return
+        }
+        panelAnimator = ValueAnimator.ofInt(from, to).apply {
+            duration = 200
+            addUpdateListener {
+                lp.height = it.animatedValue as Int
+                panel.layoutParams = lp
+            }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                private var cancelled = false
+                override fun onAnimationCancel(a: android.animation.Animator) { cancelled = true }
+                override fun onAnimationEnd(a: android.animation.Animator) {
+                    if (!cancelled && !collapse) {
+                        lp.height = ViewGroup.LayoutParams.WRAP_CONTENT
+                        panel.layoutParams = lp
+                    }
+                }
+            })
+            start()
+        }
+    }
+
     private fun setTicketsTab(on: Boolean) {
+        if (on) setPanelCollapsed(false, animate = false)
         ticketsTab = on
         refreshTabs()
         if (on) showPrompt() else search()
