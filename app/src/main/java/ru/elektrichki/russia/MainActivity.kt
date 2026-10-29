@@ -57,9 +57,12 @@ class MainActivity : BaseActivity() {
     private lateinit var collapsedDay: TextView
     private var panelCollapsed = false
     private var panelAnimator: ValueAnimator? = null
-    private var swipeStartY = 0f
     private var swipeHandled = false
-    private var collapsedAtGestureStart = false
+    private var panelFraction = 1f      // 1 — шапка полностью видна, 0 — свёрнута
+    private var panelFull = 0
+    private var lastRawY = 0f
+    private var lastDir = 0
+    private var fractionAtStart = 1f
     private var pullStartY = 0f
     private var pullDistance = 0f
     private var isPullRefreshing = false
@@ -271,36 +274,29 @@ class MainActivity : BaseActivity() {
                 android.view.MotionEvent.ACTION_DOWN -> {
                     pullStartY = event.y
                     pullDistance = 0f
-                    swipeStartY = event.rawY
+                    panelAnimator?.cancel()
+                    panelFull = measurePanelFull()
+                    lastRawY = event.rawY
+                    lastDir = 0
+                    fractionAtStart = panelFraction
                     swipeHandled = false
-                    collapsedAtGestureStart = panelCollapsed
                 }
                 android.view.MotionEvent.ACTION_MOVE -> {
                     val dy = event.y - pullStartY
-                    // Свайп вверх — прячем шапку, вниз — показываем; работает непрерывно,
-                    // без отрыва пальца. rawY, потому что список двигается при смене высоты шапки.
+                    // Шапка следует за пальцем: вверх — уменьшается, вниз — растёт.
+                    // rawY, потому что список двигается при смене высоты шапки.
                     val y = event.rawY
-                    val threshold = Ui.dp(this@MainActivity, 20)
-                    if (!ticketsTab) {
-                        if (!panelCollapsed) {
-                            // ждём движения вверх; якорь — самая нижняя точка пальца
-                            if (y > swipeStartY) swipeStartY = y
-                            if (swipeStartY - y > threshold) {
-                                setPanelCollapsed(true)
-                                swipeHandled = true
-                                swipeStartY = y
-                            }
-                        } else {
-                            // ждём движения вниз; якорь — самая верхняя точка пальца
-                            if (y < swipeStartY) swipeStartY = y
-                            if (y - swipeStartY > threshold) {
-                                setPanelCollapsed(false)
-                                swipeHandled = true
-                                swipeStartY = y
-                            }
+                    val d = y - lastRawY
+                    lastRawY = y
+                    if (!ticketsTab && panelFull > 0 && d != 0f) {
+                        if (kotlin.math.abs(d) > 1f) lastDir = if (d < 0) -1 else 1
+                        val target = (panelFraction + d / panelFull).coerceIn(0f, 1f)
+                        if (target != panelFraction) {
+                            applyPanelFraction(target)
+                            swipeHandled = true
                         }
                     }
-                    if (!isPullRefreshing && !collapsedAtGestureStart && !swipeHandled && scroll.scrollY == 0 && dy > 0) {
+                    if (!isPullRefreshing && fractionAtStart >= 1f && !swipeHandled && scroll.scrollY == 0 && dy > 0) {
                         pullDistance = dy
                         val shown = (dy / Ui.dp(this@MainActivity, 100)).coerceIn(0f, 1f)
                         refreshIndicator.visibility = View.VISIBLE
@@ -310,7 +306,16 @@ class MainActivity : BaseActivity() {
                     }
                 }
                 android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                    if (!isPullRefreshing && !collapsedAtGestureStart && !swipeHandled && scroll.scrollY == 0 && pullDistance >= Ui.dp(this@MainActivity, 80)) {
+                    if (!ticketsTab && panelFraction > 0f && panelFraction < 1f) {
+                        // докручиваем до ближайшего состояния с учётом направления
+                        val to = when (lastDir) {
+                            -1 -> 0f
+                            1 -> 1f
+                            else -> if (panelFraction < 0.5f) 0f else 1f
+                        }
+                        animatePanelFraction(to)
+                    }
+                    if (!isPullRefreshing && fractionAtStart >= 1f && !swipeHandled && scroll.scrollY == 0 && pullDistance >= Ui.dp(this@MainActivity, 80)) {
                         isPullRefreshing = true
                         refreshIndicator.animate().cancel()
                         refreshIndicator.animate()
@@ -440,46 +445,50 @@ class MainActivity : BaseActivity() {
         collapsedDay.text = day
     }
 
-    /** Плавно сворачивает/разворачивает верхнюю панель (маршрут + дни). */
-    private fun setPanelCollapsed(collapse: Boolean, animate: Boolean = true) {
-        if (collapse == panelCollapsed) return
-        panelCollapsed = collapse
-        refreshCollapsedBar()
-        collapsedBar.visibility = if (collapse) View.VISIBLE else View.GONE
-        panelAnimator?.cancel()
+    private fun measurePanelFull(): Int {
+        val width = if (panel.width > 0) panel.width else resources.displayMetrics.widthPixels
+        panel.measure(
+            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        )
+        return panel.measuredHeight
+    }
+
+    /** Ставит шапку в положение f (0..1): высота панели, высота и прозрачность полоски. */
+    private fun applyPanelFraction(f: Float) {
+        panelFraction = f.coerceIn(0f, 1f)
+        panelCollapsed = panelFraction <= 0f
         val lp = panel.layoutParams
-        val from = panel.height
-        val to = if (collapse) 0 else {
-            val width = if (panel.width > 0) panel.width else resources.displayMetrics.widthPixels
-            panel.measure(
-                View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
-                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
-            )
-            panel.measuredHeight
-        }
-        if (!animate) {
-            lp.height = if (collapse) 0 else ViewGroup.LayoutParams.WRAP_CONTENT
-            panel.layoutParams = lp
-            return
-        }
-        panelAnimator = ValueAnimator.ofInt(from, to).apply {
-            duration = 200
-            addUpdateListener {
-                lp.height = it.animatedValue as Int
-                panel.layoutParams = lp
-            }
-            addListener(object : android.animation.AnimatorListenerAdapter() {
-                private var cancelled = false
-                override fun onAnimationCancel(a: android.animation.Animator) { cancelled = true }
-                override fun onAnimationEnd(a: android.animation.Animator) {
-                    if (!cancelled && !collapse) {
-                        lp.height = ViewGroup.LayoutParams.WRAP_CONTENT
-                        panel.layoutParams = lp
-                    }
-                }
-            })
+        lp.height = if (panelFraction >= 1f) ViewGroup.LayoutParams.WRAP_CONTENT
+        else (panelFull * panelFraction).toInt()
+        panel.layoutParams = lp
+        // содержимое уезжает вверх вместе с нижним краем шапки
+        val shift = if (panelFraction >= 1f) 0f else -(panelFull * (1f - panelFraction))
+        for (i in 0 until panel.childCount) panel.getChildAt(i).translationY = shift
+        val barLp = collapsedBar.layoutParams
+        barLp.height = (Ui.dp(this, 48) * (1f - panelFraction)).toInt()
+        collapsedBar.layoutParams = barLp
+        collapsedBar.alpha = 1f - panelFraction
+        collapsedBar.visibility = if (panelFraction >= 1f) View.GONE else View.VISIBLE
+        refreshCollapsedBar()
+    }
+
+    private fun animatePanelFraction(to: Float) {
+        panelAnimator?.cancel()
+        if (panelFull <= 0) panelFull = measurePanelFull()
+        panelAnimator = ValueAnimator.ofFloat(panelFraction, to).apply {
+            duration = 160
+            addUpdateListener { applyPanelFraction(it.animatedValue as Float) }
             start()
         }
+    }
+
+    /** Сворачивает/разворачивает шапку целиком (нажатие на полоску, смена вкладки). */
+    private fun setPanelCollapsed(collapse: Boolean, animate: Boolean = true) {
+        panelAnimator?.cancel()
+        panelFull = measurePanelFull()
+        val to = if (collapse) 0f else 1f
+        if (animate) animatePanelFraction(to) else applyPanelFraction(to)
     }
 
     private fun setTicketsTab(on: Boolean) {
