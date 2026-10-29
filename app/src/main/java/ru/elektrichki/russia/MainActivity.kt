@@ -51,7 +51,10 @@ class MainActivity : BaseActivity() {
     private lateinit var bookmark: ImageView
     private lateinit var refreshIndicator: ImageView
     private lateinit var panel: LinearLayout
-    private lateinit var collapsedBar: TextView
+    private lateinit var collapsedBar: LinearLayout
+    private lateinit var collapsedFrom: TextView
+    private lateinit var collapsedTo: TextView
+    private lateinit var collapsedDay: TextView
     private var panelCollapsed = false
     private var panelAnimator: ValueAnimator? = null
     private var swipeStartY = 0f
@@ -201,19 +204,48 @@ class MainActivity : BaseActivity() {
         panel.addView(daysRow, LinearLayout.LayoutParams(-1, Ui.dp(this, 64)))
         root.addView(panel)
 
-        // Тонкая полоска вместо свёрнутой шапки: «A → B · день»
-        collapsedBar = TextView(this).apply {
-            textSize = 16f
-            setTextColor(Ui.WHITE)
+        // Тонкая полоска вместо свёрнутой шапки: [A станция] → [B станция] день
+        collapsedBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.END
             setBackgroundColor(Ui.PANEL)
             setPadding(Ui.dp(context, 16), 0, Ui.dp(context, 16), 0)
             visibility = View.GONE
             setOnClickListener { setPanelCollapsed(false) }
         }
-        root.addView(collapsedBar, LinearLayout.LayoutParams(-1, Ui.dp(this, 40)))
+        fun chip(letter: String, bg: Int): Pair<LinearLayout, TextView> {
+            val name = TextView(this).apply {
+                textSize = 16f
+                setTextColor(Ui.WHITE)
+                gravity = Gravity.CENTER_VERTICAL
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                setPadding(Ui.dp(context, 12), 0, Ui.dp(context, 8), 0)
+            }
+            val box = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setBackgroundResource(R.drawable.bg_station_chip)
+            }
+            box.addView(badge(letter, bg).apply { textSize = 18f }, LinearLayout.LayoutParams(Ui.dp(this, 32), Ui.dp(this, 32)))
+            box.addView(name, LinearLayout.LayoutParams(0, -1, 1f))
+            return box to name
+        }
+        val (chipA, nameA) = chip("A", R.drawable.bg_badge_a)
+        val (chipB, nameB) = chip("B", R.drawable.bg_badge_b)
+        collapsedFrom = nameA
+        collapsedTo = nameB
+        collapsedDay = Ui.text(this, "", 14f, Ui.GRAY_LIGHT).apply {
+            maxLines = 1
+            setPadding(Ui.dp(context, 10), 0, 0, 0)
+        }
+        collapsedBar.addView(chipA, LinearLayout.LayoutParams(0, Ui.dp(this, 32), 1f))
+        collapsedBar.addView(Ui.text(this, "→", 20f, Ui.WHITE).apply {
+            gravity = Gravity.CENTER
+        }, LinearLayout.LayoutParams(Ui.dp(this, 32), -2))
+        collapsedBar.addView(chipB, LinearLayout.LayoutParams(0, Ui.dp(this, 32), 1f))
+        collapsedBar.addView(collapsedDay, LinearLayout.LayoutParams(-2, -2))
+        root.addView(collapsedBar, LinearLayout.LayoutParams(-1, Ui.dp(this, 48)))
 
         // Список + плавающая кнопка
         val body = FrameLayout(this)
@@ -392,7 +424,9 @@ class MainActivity : BaseActivity() {
             DAY_CUSTOM -> if (customDate.isNotBlank()) Ui.dateShort(customDate) else "Сегодня"
             else -> "Сегодня"
         }
-        collapsedBar.text = "$from → $to · $day"
+        collapsedFrom.text = from
+        collapsedTo.text = to
+        collapsedDay.text = day
     }
 
     /** Плавно сворачивает/разворачивает верхнюю панель (маршрут + дни). */
