@@ -18,7 +18,6 @@ val yandexRaspApiKey = apiKeyProperties
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("com.google.devtools.ksp")
 }
 
 android {
@@ -50,23 +49,51 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+        // Убираем runtime-проверки параметров Kotlin: меньше байткода, поведение для пользователя не меняется.
+        freeCompilerArgs += listOf(
+            "-Xno-param-assertions",
+            "-Xno-call-assertions",
+            "-Xno-receiver-assertions"
+        )
     }
 
     // Автоматическая подпись для личного использования.
     buildTypes {
         getByName("release") {
+            isMinifyEnabled = true      // R8: удаление неиспользуемого кода и оптимизация
+            isShrinkResources = true    // удаление неиспользуемых ресурсов
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
             signingConfig = signingConfigs.getByName("debug")
         }
+    }
+
+    // Служебные файлы библиотек, не нужные в рантайме.
+    packaging {
+        resources {
+            excludes += setOf(
+                "/META-INF/{AL2.0,LGPL2.1}",
+                "/META-INF/*.version",
+                "/META-INF/com/android/build/gradle/app-metadata.properties",
+                "DebugProbesKt.bin",
+                "kotlin-tooling-metadata.json",
+                "/kotlin/**",
+                "/META-INF/*.kotlin_module"
+            )
+        }
+    }
+
+    // Блоб с метаданными зависимостей (нужен только для Google Play).
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
     }
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.15.0")
-    implementation("androidx.appcompat:appcompat:1.7.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
-    implementation("androidx.room:room-runtime:2.7.2")
-    implementation("androidx.room:room-ktx:2.7.2")
-    ksp("androidx.room:room-compiler:2.7.2")
+    // Без AndroidX: UI строится в коде на стандартных виджетах, кэш — на SQLiteOpenHelper,
+    // BaseActivity заменяет lifecycleScope и Activity Result API. Ресурсов библиотек в APK нет.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 }
-

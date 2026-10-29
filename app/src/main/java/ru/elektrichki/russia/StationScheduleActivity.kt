@@ -11,9 +11,6 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import org.json.JSONObject
@@ -28,7 +25,7 @@ import java.util.Locale
  * Расписание станции: название станции, «В любую сторону», выбор дня и список всех
  * отправлений со станции (в обе стороны), как в Яндекс Электричках.
  */
-class StationScheduleActivity : AppCompatActivity() {
+class StationScheduleActivity : BaseActivity() {
     private lateinit var api: YandexRaspApi
     private var stationCode = ""
     private var stationTitle = ""
@@ -51,10 +48,10 @@ class StationScheduleActivity : AppCompatActivity() {
 
     private class Entry(val departure: String, val depMs: Long?, val title: String, val express: Boolean)
 
-    private val pickDateLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
-        if (r.resultCode != RESULT_OK) return@registerForActivityResult
+    private val pickDateLauncher = registerForResult { r ->
+        if (r.resultCode != RESULT_OK) return@registerForResult
         val date = r.data?.getStringExtra(DatePickActivity.EXTRA_DATE).orEmpty()
-        if (date.isBlank()) return@registerForActivityResult
+        if (date.isBlank()) return@registerForResult
         customDate = date
         dayMode = DAY_CUSTOM
         refreshDays()
@@ -78,12 +75,12 @@ class StationScheduleActivity : AppCompatActivity() {
         }
     }
 
-    private val pickStation = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
-        if (r.resultCode != RESULT_OK) return@registerForActivityResult
-        val data = r.data ?: return@registerForActivityResult
+    private val pickStation = registerForResult { r ->
+        if (r.resultCode != RESULT_OK) return@registerForResult
+        val data = r.data ?: return@registerForResult
         val code = data.getStringExtra(StationSearchActivity.EXTRA_CODE).orEmpty()
         val title = data.getStringExtra(StationSearchActivity.EXTRA_TITLE).orEmpty()
-        if (code.isBlank() || title.isBlank()) return@registerForActivityResult
+        if (code.isBlank() || title.isBlank()) return@registerForResult
         stationCode = code
         stationTitle = title
         stationTitleText.text = title

@@ -9,12 +9,11 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
 import java.util.Calendar
 import java.util.Locale
 
 /** Полноэкранный выбор даты: список месяцев с сеткой дней (ПН–ВС), как в Яндекс Электричках. */
-class DatePickActivity : AppCompatActivity() {
+class DatePickActivity : BaseActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
