@@ -26,7 +26,7 @@ import javax.crypto.spec.SecretKeySpec
  */
 object ApiKeyFile {
     const val DEFAULT_URL =
-        "https://raw.githubusercontent.com/definitly486/ElektrichkiRussia/feature/swipe-collapse-header/api.enc"
+        "https://github.com/definitly486/ElektrichkiRussia/releases/download/api/api.enc"
 
     private const val ITERATIONS = 200_000
     private const val SALT_LEN = 8
