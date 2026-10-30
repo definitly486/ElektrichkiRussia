@@ -21,6 +21,9 @@ class FavoritesActivity : BaseActivity() {
     /** routeKey выбранного по long-press маршрута; null — режим выбора выключен. */
     private var selectedKey: String? = null
 
+    /** Временный разворот Откуда/Куда в списке (без открытия главного экрана). */
+    private val flippedKeys = mutableSetOf<String>()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.statusBarColor = Ui.PANEL
@@ -151,11 +154,16 @@ class FavoritesActivity : BaseActivity() {
         }
         for (i in 0 until favorites.length()) {
             val item = favorites.optJSONObject(i) ?: continue
-            val fromCode = item.optString("from_code")
-            val fromTitle = item.optString("from_title", "Откуда")
-            val toCode = item.optString("to_code")
-            val toTitle = item.optString("to_title", "Куда")
-            val routeKey = "$fromCode|$toCode"
+            val savedFromCode = item.optString("from_code")
+            val savedFromTitle = item.optString("from_title", "Откуда")
+            val savedToCode = item.optString("to_code")
+            val savedToTitle = item.optString("to_title", "Куда")
+            val routeKey = "$savedFromCode|$savedToCode"
+            val flipped = routeKey in flippedKeys
+            val fromCode = if (flipped) savedToCode else savedFromCode
+            val fromTitle = if (flipped) savedToTitle else savedFromTitle
+            val toCode = if (flipped) savedFromCode else savedToCode
+            val toTitle = if (flipped) savedFromTitle else savedToTitle
             val selected = selectedKey == routeKey
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -163,7 +171,6 @@ class FavoritesActivity : BaseActivity() {
                 setBackgroundColor(if (selected) 0xFF3A3A3A.toInt() else Ui.PANEL)
                 setPadding(Ui.dp(context, 16), Ui.dp(context, 12), Ui.dp(context, 8), Ui.dp(context, 12))
                 isLongClickable = true
-                // Главный экран открывается только тапом по блоку маршрута (не по всей строке / не по swap)
                 setOnLongClickListener {
                     enterSelection(routeKey)
                     true
@@ -190,19 +197,18 @@ class FavoritesActivity : BaseActivity() {
                 addView(Ui.text(this@FavoritesActivity, "↓  $toTitle", 16f, Ui.GRAY_LIGHT))
             }
             row.addView(titles, LinearLayout.LayoutParams(0, -2, 1f))
-            // Стрелки «туда-сюда»: открыть расписание с станциями наоборот
+            // Только меняет местами Откуда/Куда в списке; главный экран не открывает
             row.addView(ImageView(this).apply {
                 setImageResource(R.drawable.ic_swap)
-                setColorFilter(Ui.GRAY_LIGHT)
+                setColorFilter(if (flipped) Ui.NAV_ACTIVE else Ui.GRAY_LIGHT)
                 setPadding(Ui.dp(context, 12), Ui.dp(context, 12), Ui.dp(context, 12), Ui.dp(context, 12))
                 contentDescription = "Поменять станции местами"
                 isClickable = true
                 isFocusable = true
                 setOnClickListener {
-                    if (selectedKey != null) {
-                        clearSelection()
-                    }
-                    openRoute(toCode, toTitle, fromCode, fromTitle)
+                    if (routeKey in flippedKeys) flippedKeys.remove(routeKey)
+                    else flippedKeys.add(routeKey)
+                    renderFavorites()
                 }
             }, LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48)))
             list.addView(row, LinearLayout.LayoutParams(-1, -2))
