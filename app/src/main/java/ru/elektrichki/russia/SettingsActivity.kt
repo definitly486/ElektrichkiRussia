@@ -126,8 +126,6 @@ class SettingsActivity : BaseActivity() {
                 runOnUiThread { Toast.makeText(this@SettingsActivity, "Кэш очищен", Toast.LENGTH_SHORT).show() }
             }
         }, LinearLayout.LayoutParams(-1, Ui.dp(this, 48)))
-        body.addView(darkButton("Назад") { finish() },
-            LinearLayout.LayoutParams(-1, Ui.dp(this, 48)).apply { topMargin = Ui.dp(this@SettingsActivity, 12) })
 
         // Нижняя навигация, как на остальных экранах; активна пятая иконка
         val nav = LinearLayout(this).apply {
