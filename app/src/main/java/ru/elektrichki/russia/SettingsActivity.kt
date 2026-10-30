@@ -1,12 +1,15 @@
 package ru.elektrichki.russia
 
 import android.app.AlertDialog
+import android.content.Intent
 import android.os.Bundle
 import android.text.InputType
 import android.view.Gravity
 import android.widget.EditText
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import kotlinx.coroutines.launch
@@ -34,7 +37,12 @@ class SettingsActivity : BaseActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding(Ui.dp(context, 16), Ui.dp(context, 20), Ui.dp(context, 16), Ui.dp(context, 16))
         }
-        root.addView(body)
+        // Содержимое прокручивается, а нижняя навигация остаётся на месте
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            addView(body, FrameLayout.LayoutParams(-1, -2))
+        }
+        root.addView(scroll, LinearLayout.LayoutParams(-1, 0, 1f))
 
         body.addView(Ui.text(this, "API-ключ Яндекс Расписаний", 16f, Ui.GRAY_LIGHT))
         val key = EditText(this).apply {
@@ -120,6 +128,31 @@ class SettingsActivity : BaseActivity() {
         }, LinearLayout.LayoutParams(-1, Ui.dp(this, 48)))
         body.addView(darkButton("Назад") { finish() },
             LinearLayout.LayoutParams(-1, Ui.dp(this, 48)).apply { topMargin = Ui.dp(this@SettingsActivity, 12) })
+
+        // Нижняя навигация, как на остальных экранах; активна пятая иконка
+        val nav = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setBackgroundColor(Ui.PANEL)
+        }
+        val icons = intArrayOf(R.drawable.ic_nav_route, R.drawable.ic_nav_bookmark, R.drawable.ic_nav_ticket, R.drawable.ic_nav_history, R.drawable.ic_nav_settings)
+        icons.forEachIndexed { i, res ->
+            val v = ImageView(this).apply {
+                setImageResource(res)
+                setColorFilter(if (i == 4) Ui.NAV_ACTIVE else Ui.NAV_IDLE)
+                setPadding(Ui.dp(context, 18), Ui.dp(context, 16), Ui.dp(context, 18), Ui.dp(context, 16))
+                setOnClickListener {
+                    when (i) {
+                        0 -> finish()
+                        1 -> startActivity(Intent(this@SettingsActivity, FavoritesActivity::class.java))
+                        3 -> startActivity(Intent(this@SettingsActivity, StationScheduleActivity::class.java))
+                        4 -> {}
+                        else -> Toast.makeText(this@SettingsActivity, "Этот раздел пока не реализован", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            nav.addView(v, LinearLayout.LayoutParams(0, Ui.dp(this, 60), 1f))
+        }
+        root.addView(nav)
     }
 
     /** Диалог ввода пароля от api.enc; пароль нигде не сохраняется. */
