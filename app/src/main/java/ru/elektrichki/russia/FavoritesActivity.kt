@@ -162,22 +162,8 @@ class FavoritesActivity : BaseActivity() {
                 gravity = Gravity.CENTER_VERTICAL
                 setBackgroundColor(if (selected) 0xFF3A3A3A.toInt() else Ui.PANEL)
                 setPadding(Ui.dp(context, 16), Ui.dp(context, 12), Ui.dp(context, 8), Ui.dp(context, 12))
-                isClickable = true
                 isLongClickable = true
-                setOnClickListener {
-                    if (selectedKey != null) {
-                        // В режиме выбора короткий тап переключает выделение на эту карточку
-                        enterSelection(routeKey)
-                    } else {
-                        startActivity(
-                            Intent(this@FavoritesActivity, MainActivity::class.java)
-                                .putExtra(MainActivity.EXTRA_FROM_CODE, fromCode)
-                                .putExtra(MainActivity.EXTRA_FROM_TITLE, fromTitle)
-                                .putExtra(MainActivity.EXTRA_TO_CODE, toCode)
-                                .putExtra(MainActivity.EXTRA_TO_TITLE, toTitle)
-                        )
-                    }
-                }
+                // Главный экран открывается только тапом по блоку маршрута (не по всей строке / не по swap)
                 setOnLongClickListener {
                     enterSelection(routeKey)
                     true
@@ -189,25 +175,34 @@ class FavoritesActivity : BaseActivity() {
                     marginEnd = Ui.dp(this@FavoritesActivity, 16)
                 }
             )
-            row.addView(LinearLayout(this).apply {
+            val titles = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    if (selectedKey != null) {
+                        enterSelection(routeKey)
+                    } else {
+                        openRoute(fromCode, fromTitle, toCode, toTitle)
+                    }
+                }
                 addView(Ui.text(this@FavoritesActivity, fromTitle, 18f, Ui.WHITE, true))
                 addView(Ui.text(this@FavoritesActivity, "↓  $toTitle", 16f, Ui.GRAY_LIGHT))
-            }, LinearLayout.LayoutParams(0, -2, 1f))
-            // Стрелки «туда-сюда»: поменять станции местами и открыть расписание
+            }
+            row.addView(titles, LinearLayout.LayoutParams(0, -2, 1f))
+            // Стрелки «туда-сюда»: открыть расписание с станциями наоборот
             row.addView(ImageView(this).apply {
                 setImageResource(R.drawable.ic_swap)
                 setColorFilter(Ui.GRAY_LIGHT)
                 setPadding(Ui.dp(context, 12), Ui.dp(context, 12), Ui.dp(context, 12), Ui.dp(context, 12))
                 contentDescription = "Поменять станции местами"
+                isClickable = true
+                isFocusable = true
                 setOnClickListener {
-                    startActivity(
-                        Intent(this@FavoritesActivity, MainActivity::class.java)
-                            .putExtra(MainActivity.EXTRA_FROM_CODE, toCode)
-                            .putExtra(MainActivity.EXTRA_FROM_TITLE, toTitle)
-                            .putExtra(MainActivity.EXTRA_TO_CODE, fromCode)
-                            .putExtra(MainActivity.EXTRA_TO_TITLE, fromTitle)
-                    )
+                    if (selectedKey != null) {
+                        clearSelection()
+                    }
+                    openRoute(toCode, toTitle, fromCode, fromTitle)
                 }
             }, LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48)))
             list.addView(row, LinearLayout.LayoutParams(-1, -2))
@@ -220,6 +215,16 @@ class FavoritesActivity : BaseActivity() {
         selectedKey = null
         if (::actionBar.isInitialized) actionBar.visibility = View.GONE
         if (::nav.isInitialized) nav.visibility = View.VISIBLE
+    }
+
+    private fun openRoute(fromCode: String, fromTitle: String, toCode: String, toTitle: String) {
+        startActivity(
+            Intent(this, MainActivity::class.java)
+                .putExtra(MainActivity.EXTRA_FROM_CODE, fromCode)
+                .putExtra(MainActivity.EXTRA_FROM_TITLE, fromTitle)
+                .putExtra(MainActivity.EXTRA_TO_CODE, toCode)
+                .putExtra(MainActivity.EXTRA_TO_TITLE, toTitle)
+        )
     }
 
     private fun readFavorites(): JSONArray = try {
