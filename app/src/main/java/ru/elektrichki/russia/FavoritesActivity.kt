@@ -49,23 +49,25 @@ class FavoritesActivity : BaseActivity() {
         actionBar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setBackgroundColor(Ui.PANEL)
+            setBackgroundColor(0xFF1C1C1C.toInt())
             visibility = View.GONE
-            minimumHeight = Ui.dp(context, 56)
+            minimumHeight = Ui.dp(context, 64)
         }
         val backBtn = ImageView(this).apply {
             setImageResource(R.drawable.ic_back)
             setColorFilter(Ui.WHITE)
-            setPadding(Ui.dp(context, 20), Ui.dp(context, 16), Ui.dp(context, 20), Ui.dp(context, 16))
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setPadding(Ui.dp(context, 18), Ui.dp(context, 16), Ui.dp(context, 18), Ui.dp(context, 16))
             contentDescription = "Отменить выбор"
             setOnClickListener { clearSelection() }
         }
-        actionBar.addView(backBtn, LinearLayout.LayoutParams(Ui.dp(this, 56), Ui.dp(this, 56)))
+        actionBar.addView(backBtn, LinearLayout.LayoutParams(Ui.dp(this, 72), Ui.dp(this, 64)))
         actionBar.addView(View(this), LinearLayout.LayoutParams(0, 1, 1f))
         val deleteBtn = ImageView(this).apply {
             setImageResource(R.drawable.ic_delete)
             setColorFilter(Ui.WHITE)
-            setPadding(Ui.dp(context, 20), Ui.dp(context, 16), Ui.dp(context, 20), Ui.dp(context, 16))
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setPadding(Ui.dp(context, 18), Ui.dp(context, 16), Ui.dp(context, 18), Ui.dp(context, 16))
             contentDescription = "Удалить из избранного"
             setOnClickListener {
                 val key = selectedKey
@@ -75,8 +77,8 @@ class FavoritesActivity : BaseActivity() {
                 }
             }
         }
-        actionBar.addView(deleteBtn, LinearLayout.LayoutParams(Ui.dp(this, 56), Ui.dp(this, 56)))
-        root.addView(actionBar, LinearLayout.LayoutParams(-1, Ui.dp(this, 56)))
+        actionBar.addView(deleteBtn, LinearLayout.LayoutParams(Ui.dp(this, 72), Ui.dp(this, 64)))
+        root.addView(actionBar, LinearLayout.LayoutParams(-1, Ui.dp(this, 64)))
 
         nav = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -186,12 +188,17 @@ class FavoritesActivity : BaseActivity() {
                 orientation = LinearLayout.VERTICAL
                 isClickable = true
                 isFocusable = true
+                isLongClickable = true
                 setOnClickListener {
                     if (selectedKey != null) {
                         enterSelection(routeKey)
                     } else {
                         openRoute(fromCode, fromTitle, toCode, toTitle)
                     }
+                }
+                setOnLongClickListener {
+                    enterSelection(routeKey)
+                    true
                 }
                 addView(Ui.text(this@FavoritesActivity, fromTitle, 18f, Ui.WHITE, true))
                 addView(Ui.text(this@FavoritesActivity, "↓  $toTitle", 16f, Ui.GRAY_LIGHT))
@@ -205,10 +212,15 @@ class FavoritesActivity : BaseActivity() {
                 contentDescription = "Поменять станции местами"
                 isClickable = true
                 isFocusable = true
+                isLongClickable = true
                 setOnClickListener {
                     if (routeKey in flippedKeys) flippedKeys.remove(routeKey)
                     else flippedKeys.add(routeKey)
                     renderFavorites()
+                }
+                setOnLongClickListener {
+                    enterSelection(routeKey)
+                    true
                 }
             }, LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48)))
             list.addView(row, LinearLayout.LayoutParams(-1, -2))
