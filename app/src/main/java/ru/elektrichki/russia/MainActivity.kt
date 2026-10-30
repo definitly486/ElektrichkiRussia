@@ -108,6 +108,12 @@ class MainActivity : BaseActivity() {
         search()
     }
 
+    override fun onResume() {
+        super.onResume()
+        // После удаления маршрута на экране «Избранное» иконка закладки должна обновиться
+        refreshBookmarkIcon()
+    }
+
     // ------------------------------------------------------------------ UI
 
     private fun buildUi() {
