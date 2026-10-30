@@ -1,9 +1,11 @@
 package ru.elektrichki.russia
 
 import android.content.Intent
+import android.animation.ValueAnimator
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
@@ -48,6 +50,19 @@ class MainActivity : BaseActivity() {
     private lateinit var fab: FrameLayout
     private lateinit var bookmark: ImageView
     private lateinit var refreshIndicator: ImageView
+    private lateinit var panel: LinearLayout
+    private lateinit var collapsedBar: LinearLayout
+    private lateinit var collapsedFrom: TextView
+    private lateinit var collapsedTo: TextView
+    private lateinit var collapsedDay: TextView
+    private var panelCollapsed = false
+    private var panelAnimator: ValueAnimator? = null
+    private var swipeHandled = false
+    private var panelFraction = 1f      // 1 — шапка полностью видна, 0 — свёрнута
+    private var panelFull = 0
+    private var lastRawY = 0f
+    private var lastDir = 0
+    private var fractionAtStart = 1f
     private var pullStartY = 0f
     private var pullDistance = 0f
     private var isPullRefreshing = false
@@ -103,7 +118,7 @@ class MainActivity : BaseActivity() {
         }
 
         // Панель маршрута A → B
-        val panel = LinearLayout(this).apply {
+        panel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Ui.PANEL)
         }
@@ -192,6 +207,49 @@ class MainActivity : BaseActivity() {
         panel.addView(daysRow, LinearLayout.LayoutParams(-1, Ui.dp(this, 64)))
         root.addView(panel)
 
+        // Тонкая полоска вместо свёрнутой шапки: [A станция] → [B станция] день
+        collapsedBar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setBackgroundColor(Ui.PANEL)
+            setPadding(Ui.dp(context, 16), 0, Ui.dp(context, 16), 0)
+            visibility = View.GONE
+            setOnClickListener { setPanelCollapsed(false) }
+        }
+        fun chip(letter: String, bg: Int): Pair<LinearLayout, TextView> {
+            val name = TextView(this).apply {
+                textSize = 16f
+                setTextColor(Ui.WHITE)
+                gravity = Gravity.CENTER_VERTICAL
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                setPadding(Ui.dp(context, 12), 0, Ui.dp(context, 8), 0)
+            }
+            val box = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setBackgroundResource(R.drawable.bg_station_chip)
+            }
+            box.addView(badge(letter, bg).apply { textSize = 18f }, LinearLayout.LayoutParams(Ui.dp(this, 32), Ui.dp(this, 32)))
+            box.addView(name, LinearLayout.LayoutParams(0, -1, 1f))
+            return box to name
+        }
+        val (chipA, nameA) = chip("A", R.drawable.bg_badge_a)
+        val (chipB, nameB) = chip("B", R.drawable.bg_badge_b)
+        collapsedFrom = nameA
+        collapsedTo = nameB
+        collapsedDay = Ui.text(this, "", 14f, Ui.GRAY_LIGHT).apply {
+            maxLines = 1
+            setPadding(Ui.dp(context, 10), 0, 0, 0)
+        }
+        collapsedBar.addView(chipA, LinearLayout.LayoutParams(0, Ui.dp(this, 32), 1f))
+        collapsedBar.addView(Ui.text(this, "→", 20f, Ui.WHITE).apply {
+            gravity = Gravity.CENTER
+        }, LinearLayout.LayoutParams(Ui.dp(this, 32), -2))
+        collapsedBar.addView(chipB, LinearLayout.LayoutParams(0, Ui.dp(this, 32), 1f))
+        collapsedBar.addView(collapsedDay, LinearLayout.LayoutParams(-2, -2))
+        root.addView(collapsedBar, LinearLayout.LayoutParams(-1, Ui.dp(this, 48)))
+
         // Список + плавающая кнопка
         val body = FrameLayout(this)
         content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
@@ -216,10 +274,29 @@ class MainActivity : BaseActivity() {
                 android.view.MotionEvent.ACTION_DOWN -> {
                     pullStartY = event.y
                     pullDistance = 0f
+                    panelAnimator?.cancel()
+                    panelFull = measurePanelFull()
+                    lastRawY = event.rawY
+                    lastDir = 0
+                    fractionAtStart = panelFraction
+                    swipeHandled = false
                 }
                 android.view.MotionEvent.ACTION_MOVE -> {
                     val dy = event.y - pullStartY
-                    if (!isPullRefreshing && scroll.scrollY == 0 && dy > 0) {
+                    // Шапка следует за пальцем: вверх — уменьшается, вниз — растёт.
+                    // rawY, потому что список двигается при смене высоты шапки.
+                    val y = event.rawY
+                    val d = y - lastRawY
+                    lastRawY = y
+                    if (!ticketsTab && panelFull > 0 && d != 0f) {
+                        if (kotlin.math.abs(d) > 1f) lastDir = if (d < 0) -1 else 1
+                        val target = (panelFraction + d / panelFull).coerceIn(0f, 1f)
+                        if (target != panelFraction) {
+                            applyPanelFraction(target)
+                            swipeHandled = true
+                        }
+                    }
+                    if (!isPullRefreshing && fractionAtStart >= 1f && !swipeHandled && scroll.scrollY == 0 && dy > 0) {
                         pullDistance = dy
                         val shown = (dy / Ui.dp(this@MainActivity, 100)).coerceIn(0f, 1f)
                         refreshIndicator.visibility = View.VISIBLE
@@ -229,7 +306,16 @@ class MainActivity : BaseActivity() {
                     }
                 }
                 android.view.MotionEvent.ACTION_UP, android.view.MotionEvent.ACTION_CANCEL -> {
-                    if (!isPullRefreshing && scroll.scrollY == 0 && pullDistance >= Ui.dp(this@MainActivity, 80)) {
+                    if (!ticketsTab && panelFraction > 0f && panelFraction < 1f) {
+                        // докручиваем до ближайшего состояния с учётом направления
+                        val to = when (lastDir) {
+                            -1 -> 0f
+                            1 -> 1f
+                            else -> if (panelFraction < 0.5f) 0f else 1f
+                        }
+                        animatePanelFraction(to)
+                    }
+                    if (!isPullRefreshing && fractionAtStart >= 1f && !swipeHandled && scroll.scrollY == 0 && pullDistance >= Ui.dp(this@MainActivity, 80)) {
                         isPullRefreshing = true
                         refreshIndicator.animate().cancel()
                         refreshIndicator.animate()
@@ -320,6 +406,7 @@ class MainActivity : BaseActivity() {
     private fun refreshFields() {
         fromText.text = if (fromTitle.isBlank()) "Откуда" else fromTitle
         toText.text = if (toTitle.isBlank()) "Куда" else toTitle
+        refreshCollapsedBar()
         refreshBookmarkIcon()
     }
 
@@ -340,10 +427,72 @@ class MainActivity : BaseActivity() {
         style(dayTomorrow, dayMode == DAY_TOMORROW)
         style(dayAll, dayMode == DAY_CUSTOM)
         dayAll.text = if (dayMode == DAY_CUSTOM && customDate.isNotBlank()) Ui.dateShort(customDate) else "Все дни"
+        refreshCollapsedBar()
         ticketDate.text = Ui.dateLong(currentDate())
     }
 
+    private fun refreshCollapsedBar() {
+        if (!::collapsedBar.isInitialized) return
+        val from = fromTitle.ifBlank { "Откуда" }
+        val to = toTitle.ifBlank { "Куда" }
+        val day = when (dayMode) {
+            DAY_TOMORROW -> "Завтра"
+            DAY_CUSTOM -> if (customDate.isNotBlank()) Ui.dateShort(customDate) else "Сегодня"
+            else -> "Сегодня"
+        }
+        collapsedFrom.text = from
+        collapsedTo.text = to
+        collapsedDay.text = day
+    }
+
+    private fun measurePanelFull(): Int {
+        val width = if (panel.width > 0) panel.width else resources.displayMetrics.widthPixels
+        panel.measure(
+            View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+        )
+        return panel.measuredHeight
+    }
+
+    /** Ставит шапку в положение f (0..1): высота панели, высота и прозрачность полоски. */
+    private fun applyPanelFraction(f: Float) {
+        panelFraction = f.coerceIn(0f, 1f)
+        panelCollapsed = panelFraction <= 0f
+        val lp = panel.layoutParams
+        lp.height = if (panelFraction >= 1f) ViewGroup.LayoutParams.WRAP_CONTENT
+        else (panelFull * panelFraction).toInt()
+        panel.layoutParams = lp
+        // содержимое уезжает вверх вместе с нижним краем шапки
+        val shift = if (panelFraction >= 1f) 0f else -(panelFull * (1f - panelFraction))
+        for (i in 0 until panel.childCount) panel.getChildAt(i).translationY = shift
+        val barLp = collapsedBar.layoutParams
+        barLp.height = (Ui.dp(this, 48) * (1f - panelFraction)).toInt()
+        collapsedBar.layoutParams = barLp
+        collapsedBar.alpha = 1f - panelFraction
+        collapsedBar.visibility = if (panelFraction >= 1f) View.GONE else View.VISIBLE
+        refreshCollapsedBar()
+    }
+
+    private fun animatePanelFraction(to: Float) {
+        panelAnimator?.cancel()
+        if (panelFull <= 0) panelFull = measurePanelFull()
+        panelAnimator = ValueAnimator.ofFloat(panelFraction, to).apply {
+            duration = 160
+            addUpdateListener { applyPanelFraction(it.animatedValue as Float) }
+            start()
+        }
+    }
+
+    /** Сворачивает/разворачивает шапку целиком (нажатие на полоску, смена вкладки). */
+    private fun setPanelCollapsed(collapse: Boolean, animate: Boolean = true) {
+        panelAnimator?.cancel()
+        panelFull = measurePanelFull()
+        val to = if (collapse) 0f else 1f
+        if (animate) animatePanelFraction(to) else applyPanelFraction(to)
+    }
+
     private fun setTicketsTab(on: Boolean) {
+        if (on) setPanelCollapsed(false, animate = false)
         ticketsTab = on
         refreshTabs()
         if (on) showPrompt() else search()

@@ -32,8 +32,9 @@ android {
         applicationId = "ru.elektrichki.russia"
         minSdk = 23
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        // В CI версия берётся из тега (VERSION_NAME) и номера запуска (VERSION_CODE).
+        versionCode = System.getenv("VERSION_CODE")?.toIntOrNull() ?: 1
+        versionName = System.getenv("VERSION_NAME")?.takeIf { it.isNotBlank() } ?: "1.0"
 
         buildConfigField(
             "String",
@@ -57,7 +58,20 @@ android {
         )
     }
 
-    // Автоматическая подпись для личного использования.
+    // Подпись релиза: если заданы переменные окружения (в CI из секретов) — настоящий ключ,
+    // иначе для локальной сборки остаётся debug-ключ.
+    val releaseKeystore = System.getenv("ANDROID_KEYSTORE_FILE")?.takeIf { it.isNotBlank() }
+    if (releaseKeystore != null) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         getByName("release") {
             isMinifyEnabled = true      // R8: удаление неиспользуемого кода и оптимизация
@@ -66,7 +80,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 
