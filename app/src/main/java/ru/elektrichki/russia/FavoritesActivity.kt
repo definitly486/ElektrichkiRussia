@@ -194,6 +194,22 @@ class FavoritesActivity : BaseActivity() {
                 addView(Ui.text(this@FavoritesActivity, fromTitle, 18f, Ui.WHITE, true))
                 addView(Ui.text(this@FavoritesActivity, "↓  $toTitle", 16f, Ui.GRAY_LIGHT))
             }, LinearLayout.LayoutParams(0, -2, 1f))
+            // Стрелки «туда-сюда»: поменять станции местами и открыть расписание
+            row.addView(ImageView(this).apply {
+                setImageResource(R.drawable.ic_swap)
+                setColorFilter(Ui.GRAY_LIGHT)
+                setPadding(Ui.dp(context, 12), Ui.dp(context, 12), Ui.dp(context, 12), Ui.dp(context, 12))
+                contentDescription = "Поменять станции местами"
+                setOnClickListener {
+                    startActivity(
+                        Intent(this@FavoritesActivity, MainActivity::class.java)
+                            .putExtra(MainActivity.EXTRA_FROM_CODE, toCode)
+                            .putExtra(MainActivity.EXTRA_FROM_TITLE, toTitle)
+                            .putExtra(MainActivity.EXTRA_TO_CODE, fromCode)
+                            .putExtra(MainActivity.EXTRA_TO_TITLE, fromTitle)
+                    )
+                }
+            }, LinearLayout.LayoutParams(Ui.dp(this, 48), Ui.dp(this, 48)))
             list.addView(row, LinearLayout.LayoutParams(-1, -2))
             list.addView(Ui.divider(this))
         }
